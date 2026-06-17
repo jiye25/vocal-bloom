@@ -201,7 +201,7 @@ export default function App() {
               <Sparkles className="w-9 h-9 text-white/70" />
             </div>
             <h1 className="text-4xl font-light tracking-widest text-white">
-              마음의 꽃잎, 날리다
+              Vocal Bloom
             </h1>
             <p className="text-sm text-white/50 font-light leading-relaxed tracking-wide">
               마이크에 말을 건네면 AI가 감정을 분석하여<br />

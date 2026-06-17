@@ -14,28 +14,58 @@ const EMOTION_COLORS: Record<keyof EmotionScores, THREE.Color> = {
 const WHITE = new THREE.Color(1, 1, 1);
 
 // CSS flower img (bottom:0, left:0, height:52vh) 기준 수술 중심 UV
-const FLOWER_UV_X = 0.18;
-const FLOWER_UV_Y = 0.78;
+const FLOWER_UV_X = 0.06;
+const FLOWER_UV_Y = 0.92;
 
 // ─── 꽃잎 제어 상수 (여기서 수치 조정) ──────────────────────────────────────
 const PETAL_CONFIG = {
   START_COUNT:        10,    // 최초 트리거 시 기본 스폰 개수
 
-  BASE_SIZE:          1.5,   // 꽃잎 기본 크기 (Three.js 월드 단위)
+  BASE_SIZE:          1.7,   // 꽃잎 기본 크기 (Three.js 월드 단위)
   SIZE_VARIATION:     0.03,  // 크기 랜덤 오차 ±3%
 
-  BASE_ANGLE:        -15,    // 생성 시 기본 Z 회전 각도 (도)
+  BASE_ANGLE:        -25,    // 생성 시 기본 Z 회전 각도 (도)
 
-  X_ROTATION_SPEED:   0.1,   // X축 앞뒤 까딱임 강도 (Pitch)
-  Y_ROTATION_SPEED:   0.3,   // Y축 좌우 돌림 강도 (Yaw)
-  Z_ROTATION_SPEED:   0.6,   // Z축 시계추 흔들림 강도 (Roll)
+  // ── 동선 제어 ──────────────────────────────────────────────────────────
+  TARGET_ANGLE:      -20,    // 꽃잎 진행 방향 각도 (도, 0°=수평 우측, 클수록 위로)
+  STREAM_WIDTH:       1.6,   // 바람 길 반폭 (Three.js 월드 단위, 클수록 퍼짐)
+  FORCE_DAMPING:      1.0,   // 속도 감쇠율 (낮을수록 빨리 느려짐)
+
+  X_ROTATION_SPEED:   0.2,   // X축 앞뒤 까딱임 강도 (Pitch)
+  Y_ROTATION_SPEED:   0.45,  // Y축 좌우 돌림 강도 (Yaw)
+  Z_ROTATION_SPEED:   0.7,   // Z축 시계추 흔들림 강도 (Roll)
 
   SPAWN_RADIUS_MIN:   0.80,  // 수술 중심 제외 최소 반지름
   SPAWN_RADIUS_MAX:   1.80,  // 스폰 최대 반지름
 
-  AUDIO_THRESHOLD:    0.04,  // 꽃잎 생성 시작 최소 볼륨 (0~1)
+  AUDIO_THRESHOLD:    0.12,  // 꽃잎 생성 시작 최소 볼륨 (0~1) — 소음 차단
   MAX_WIND_FORCE:     1.0,   // 최대 볼륨 시 바람 세기 승수
   MAX_PETAL_COUNT:    17,    // 화면 내 최대 꽃잎 수
+
+  // ★ 꽃잎 초기 방출 방향 (3시 방향 = 0°, 12시 = 90°)
+  SPAWN_DIRECTION_ANGLE:    0,     // 생성 첫 프레임 방출 각도 (도)
+  INITIAL_SPAWN_SPEED:      1.5,   // 초기 속도 세기 배율 (1.0 = 기본)
+
+  // ★ 꽃잎 생성 양/빈도 제어
+  SPAWN_INTERVAL_FRAMES:    5,     // N프레임마다 스폰 체크 (낮을수록 더 자주)
+  BASE_SPAWN_CHANCE:        0.08,  // 볼륨 최저(임계값)일 때 생성 확률 → 몇 초에 한 장
+  MAX_SPAWN_CHANCE:         0.85,  // 볼륨 최대(1.0)일 때 생성 확률 → 화르륵 무더기
+  BURST_SPAWN_COUNT:        1.5,   // 조건 충족 시 한 번에 생성할 꽃잎 수
+
+  IDLE_SPAWN_INTERVAL:      3.5,   // 무음 시 꽃잎 자동 생성 간격 (초)
+
+  // ★ 감정 인식 시 최소 보장 꽃잎 개수
+  MIN_EMOTION_SPAWN_COUNT:  5,     // 짧은 발화에도 최소 이 수만큼 즉시 생성
+
+  // ★ 황금 빛 파티클 — 얇은 황금 띠(은하수) 연출
+  PARTICLE_MAX_COUNT:       120,
+  PARTICLE_BASE_ALPHA:      0.35,
+  PARTICLE_MIN_SIZE:        1.0,
+  PARTICLE_MAX_SIZE:        1.8,
+  PARTICLE_WAVE_AMPLITUDE:  35,    // S자 높이 (클수록 크게 출렁임)
+  PARTICLE_WAVE_FREQUENCY:  0.015, // S자 밀도/주기 (클수록 촘촘한 파도)
+  PARTICLE_WAVE_SPEED:      0.05,  // S자 물결 자체 흐름 속도
+  PARTICLE_SPREAD_FORCE:    0.10,  // ★ 수직 확산 억제 계수
 };
 
 // ─── Simplex 3D Noise ─────────────────────────────────────────────────────────
@@ -173,7 +203,13 @@ const FRAG=/* glsl */`
     if(texel.a<0.01) discard;
     vec3 col=texel.rgb;
     float luma=dot(col,vec3(0.299,0.587,0.114));
-    col=mix(col,uTint*(luma*0.85+0.30),uTintAmount);
+    // 1단계: 원본 색상을 그레이스케일로 탈색
+    // → 어떤 사진 텍스처도 원본 색이 틴트에 간섭하지 않음
+    vec3 grey=vec3(luma);
+    // 2단계: 그레이스케일 * 틴트 → 정확한 색상 재현
+    // grey 승수 낮추고 순수 tint 가산량 증가 → 밝은 픽셀에서도 채도 유지
+    vec3 tinted=clamp(grey*uTint*0.90+uTint*0.55, 0.0, 1.0);
+    col=mix(col,tinted,uTintAmount);
     float fr=pow(1.0-max(dot(vNorm,vView),0.0),2.5);
     col+=mix(vec3(1.0),uTint,uTintAmount)*fr*(0.35+uGlow*1.2);
     gl_FragColor=vec4(col,texel.a*uOpacity);
@@ -181,13 +217,21 @@ const FRAG=/* glsl */`
 `;
 
 // ─── 파티클 텍스처 ────────────────────────────────────────────────────────────
-function makeGoldTex():THREE.Texture {
-  const c=document.createElement("canvas"); c.width=c.height=64;
+function makeSparkTex():THREE.Texture {
+  // shadowBlur로 황금 네온 아우라 생성
+  const S=128, c=document.createElement("canvas"); c.width=c.height=S;
   const ctx=c.getContext("2d")!;
-  const g=ctx.createRadialGradient(32,32,0,32,32,28);
-  g.addColorStop(0,"rgba(255,245,160,1)"); g.addColorStop(.3,"rgba(255,210,60,.85)");
-  g.addColorStop(.7,"rgba(240,170,20,.12)"); g.addColorStop(1,"rgba(220,140,0,0)");
-  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(32,32,28,0,Math.PI*2); ctx.fill();
+  // 외곽 글로우 레이어
+  ctx.shadowBlur=30; ctx.shadowColor="#FFD700";
+  const g=ctx.createRadialGradient(S/2,S/2,0,S/2,S/2,S/2*.5);
+  g.addColorStop(0,"rgba(255,255,220,1)");
+  g.addColorStop(.25,"rgba(255,215,0,.95)");
+  g.addColorStop(.6,"rgba(255,170,0,.45)");
+  g.addColorStop(1,"rgba(255,120,0,0)");
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(S/2,S/2,S/2*.5,0,Math.PI*2); ctx.fill();
+  // 두 번 그려 중심 광량 증폭
+  ctx.shadowBlur=12; ctx.shadowColor="#FFF0A0";
+  ctx.beginPath(); ctx.arc(S/2,S/2,S/2*.18,0,Math.PI*2); ctx.fill();
   return new THREE.CanvasTexture(c);
 }
 function makeBokehTex():THREE.Texture {
@@ -282,7 +326,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       });
       const vMesh=new THREE.Mesh(vGeo,vMat);
       vMesh.renderOrder=10;
-      vMesh.position.set(-1.0,-0.75,0.1);
+      vMesh.position.set(-1.3,-0.90,0.1);
       vMesh.scale.setScalar(0.9);
       scene.add(vMesh);
       return vMat;
@@ -354,13 +398,13 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       mesh.renderOrder=1;
       scene.add(mesh);
 
-      // 초기 속도: 수직 상승 제거 → 대각선 방향으로 즉시 출발
-      const STREAM_X=0.906, STREAM_Y=0.423;
-      const initSpd=0.04+Math.random()*0.03;
+      // 초기 속도: SPAWN_DIRECTION_ANGLE(3시=0°) 방향으로 출발
+      const spawnRad=PETAL_CONFIG.SPAWN_DIRECTION_ANGLE*Math.PI/180;
+      const initSpd=(0.04+Math.random()*0.03)*PETAL_CONFIG.INITIAL_SPAWN_SPEED;
       flyPetals.push({
         mesh, mat,
-        vx: STREAM_X*initSpd,
-        vy: STREAM_Y*initSpd*0.4,  // 사선, 수직 솟구침 없음
+        vx: Math.cos(spawnRad)*initSpd,
+        vy: Math.sin(spawnRad)*initSpd,
         vz:(Math.random()-.5)*0.006,
         pitchVel:0,
         yawVel:0,
@@ -377,34 +421,73 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       });
     }
 
-    // ─── 황금 먼지 파티클 풀 ────────────────────────────────────────────────
-    const MAX_DUST=2000;
-    const dustGeo=new THREE.BufferGeometry();
-    const dustPos=new Float32Array(MAX_DUST*3);
-    const dustVel=new Float32Array(MAX_DUST*3);
-    const dustAge=new Float32Array(MAX_DUST).fill(9999);
-    const dustLife=new Float32Array(MAX_DUST).fill(1);
-    for(let i=0;i<MAX_DUST;i++){dustPos[i*3]=-1e4;dustPos[i*3+1]=-1e4;}
-    dustGeo.setAttribute("position",new THREE.BufferAttribute(dustPos,3));
-    const goldTex=makeGoldTex();
-    const dustMat=new THREE.PointsMaterial({size:.06,map:goldTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,color:0xffd060});
-    scene.add(new THREE.Points(dustGeo,dustMat));
-    let nextDust=0;
+    // ─── 황금 빛 파티클 (꽃잎 미니 버전, 오디오 연동) ──────────────────────
+    const sparkTex=makeSparkTex();
+    const sparkBaseGeo=new THREE.PlaneGeometry(1,1);
 
-    function emitGoldDust(ox:number,oy:number,oz:number,pvx:number,pvy:number,vol:number){
-      const n=1+Math.floor(vol*2);
-      for(let c=0;c<n;c++){
-        const i=nextDust=(nextDust+1)%MAX_DUST;
-        dustPos[i*3]  =ox+(Math.random()-.5)*0.08;
-        dustPos[i*3+1]=oy+(Math.random()-.5)*0.08;
-        dustPos[i*3+2]=oz+(Math.random()-.5)*0.05;
-        // 꽃잎보다 가볍게 → 속도 줄이고 노이즈에 민감
-        dustVel[i*3]  =pvx*0.15+(Math.random()-.5)*0.25;
-        dustVel[i*3+1]=pvy*0.15+(Math.random()-.5)*0.20;
-        dustVel[i*3+2]=(Math.random()-.5)*0.15;
-        dustAge[i]=0;
-        dustLife[i]=0.5+Math.random()*0.6; // 0.5~1.1초 수명
-      }
+    // 꽃잎과 동일한 물리 필드 + spark 고유 회전 필드
+    interface GoldSpark {
+      mesh:THREE.Mesh; mat:THREE.MeshBasicMaterial;
+      vx:number; vy:number; vz:number;
+      pitchVel:number; yawVel:number;
+      rollAmp:number; rollFreq:number;
+      drag:number; detachDur:number; rampDur:number;
+      windStr:number; vortexSign:number;
+      noiseOff:THREE.Vector3;
+      age:number; maxAge:number;
+      phase:number; scale:number;
+    }
+    const goldSparks:GoldSpark[]=[];
+
+    // 꽃잎 뒤꽁무니 좁은 범위에서만 생성 — 얇은 황금 띠(스트림) 연출
+    function spawnGoldSpark(
+      ox:number, oy:number, oz:number,
+      pvx:number, pvy:number,
+      tint:THREE.Color
+    ){
+      if(goldSparks.length>=PETAL_CONFIG.PARTICLE_MAX_COUNT) return;
+      const mat=new THREE.MeshBasicMaterial({
+        map:sparkTex, transparent:true,
+        blending:THREE.AdditiveBlending, depthWrite:false,
+        color:new THREE.Color(0xffd700).lerp(tint,.20),
+        opacity:PETAL_CONFIG.PARTICLE_BASE_ALPHA, side:THREE.DoubleSide,
+      });
+      const mesh=new THREE.Mesh(sparkBaseGeo.clone(),mat);
+      // ★ 크기 균일화: 모래알 크기 고정
+      const szRatio=PETAL_CONFIG.PARTICLE_MIN_SIZE
+                   +Math.random()*(PETAL_CONFIG.PARTICLE_MAX_SIZE-PETAL_CONFIG.PARTICLE_MIN_SIZE);
+      const s=szRatio*0.14;
+      mesh.scale.setScalar(s);
+      // ★ 생성 위치: 꽃잎 바로 뒤 극소 범위(±0.04)
+      mesh.position.set(
+        ox+(Math.random()-.5)*.04,
+        oy+(Math.random()-.5)*.04,
+        oz+(Math.random()-.5)*.03,
+      );
+      const baseRad=PETAL_CONFIG.BASE_ANGLE*Math.PI/180;
+      mesh.rotation.set(0,0,baseRad);
+      mesh.renderOrder=0;
+      scene.add(mesh);
+
+      goldSparks.push({
+        mesh, mat,
+        // ★ 속도: 꽃잎 그대로 계승, 사방 spread 극소화
+        vx: pvx+(Math.random()-.5)*.006,
+        vy: pvy+(Math.random()-.5)*.006,
+        vz: (Math.random()-.5)*.003,
+        pitchVel:0, yawVel:0,
+        rollAmp:PETAL_CONFIG.Z_ROTATION_SPEED*(0.9+Math.random()*.2),
+        rollFreq:0.18+Math.random()*.08,
+        drag:0.95,
+        detachDur:0, rampDur:0.4+Math.random()*.3,
+        // ★ windStr 균일화 — 파티클 동일 속도로 흐름
+        windStr:0.88+Math.random()*.08,
+        vortexSign:1,  // ★ 소용돌이 제거
+        // ★ noiseOff 극소화 — 거의 동일한 noise 필드 공유
+        noiseOff:new THREE.Vector3(Math.random()*2,Math.random()*2,Math.random()*2),
+        age:0, maxAge:50,
+        phase:Math.random()*Math.PI*2, scale:s,
+      });
     }
 
     // ─── 보케 파티클 풀 ─────────────────────────────────────────────────────
@@ -437,11 +520,9 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
     const GLOW_DUR=7.5;
 
     const clock=new THREE.Clock();
-
-    // ─── 초기 꽃잎 START_COUNT개 스폰 ───────────────────────────────────────
-    for(let i=0;i<PETAL_CONFIG.START_COUNT;i++){
-      spawnPetal(0.1, WHITE.clone(), 0);
-    }
+    let spawnFrameCount=0; // SPAWN_INTERVAL_FRAMES 체크용
+    let idleSpawnTimer=0;  // 무음 idle 스폰 타이머
+    let prevHasEmo=false;  // 감정 상태 전환 감지용
 
     // ─── 렌더 루프 ───────────────────────────────────────────────────────────
     function tick(){
@@ -458,13 +539,16 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       // 감정 색 계산
       let wSum=0;
       const blended=new THREE.Color(0,0,0);
+      // ★ 지배 감정 단일 색: 가장 높은 감정 하나만 골라 100% 적용 (혼합 없음)
+      let dominantKey: keyof EmotionScores | null = null;
+      let dominantW = 0;
       (Object.keys(emo) as Array<keyof EmotionScores>).forEach(k=>{
-        const w=emo[k];
-        if(w>.04){ blended.r+=EMOTION_COLORS[k].r*w; blended.g+=EMOTION_COLORS[k].g*w; blended.b+=EMOTION_COLORS[k].b*w; wSum+=w; }
+        const w=emo[k]; wSum+=w;
+        if(w>dominantW){ dominantW=w; dominantKey=k; }
       });
-      const hasEmo=wSum>.05;
+      const hasEmo=dominantW>.08 && dominantKey!=null;
       if(hasEmo){
-        goalColor.setRGB(blended.r/wSum,blended.g/wSum,blended.b/wSum);
+        goalColor.copy(EMOTION_COLORS[dominantKey!]);
         goalTintAmt=1.0; afterglow=0;
       } else if(afterglow>=0){
         afterglow+=dt;
@@ -483,13 +567,56 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       flowerMat.uniforms["uTint"].value.copy(liveColor);
       flowerMat.uniforms["uTintAmount"].value=liveTintAmt;
 
-      // 스폰 — AUDIO_THRESHOLD 이상일 때만, 볼륨 정비례
-      if(activeRef.current && vol>PETAL_CONFIG.AUDIO_THRESHOLD){
-        const excess=vol-PETAL_CONFIG.AUDIO_THRESHOLD;
-        const spawnRate=0.008+excess*0.20;
-        if(Math.random()<spawnRate) spawnPetal(vol,liveColor,liveTintAmt);
+      // ─── 감정 최초 인식 시 최소 꽃잎 즉시 버스트 ───────────────────────
+      if(hasEmo && !prevHasEmo && activeRef.current){
+        const burstCount=Math.min(
+          PETAL_CONFIG.MIN_EMOTION_SPAWN_COUNT,
+          PETAL_CONFIG.MAX_PETAL_COUNT - flyPetals.length
+        );
+        for(let b=0;b<burstCount;b++) spawnPetal(Math.max(vol,0.3), liveColor, liveTintAmt);
       }
-      emitBokeh(vol,fp);
+      prevHasEmo=hasEmo;
+
+      // ─── 무음 idle 스폰 (최소 연출 유지) ───────────────────────────────
+      if(activeRef.current && vol < PETAL_CONFIG.AUDIO_THRESHOLD){
+        idleSpawnTimer+=dt;
+        if(idleSpawnTimer >= PETAL_CONFIG.IDLE_SPAWN_INTERVAL){
+          idleSpawnTimer=0;
+          if(flyPetals.length < PETAL_CONFIG.MAX_PETAL_COUNT)
+            spawnPetal(0, liveColor, liveTintAmt);
+        }
+      } else {
+        idleSpawnTimer=0; // 오디오 감지 시 타이머 리셋
+      }
+
+      // ─── 꽃잎 스폰 트리거 ───────────────────────────────────────────────
+      // SPAWN_INTERVAL_FRAMES마다 한 번만 체크 → 매 프레임 누적 방지
+      spawnFrameCount++;
+      if(activeRef.current && vol >= PETAL_CONFIG.AUDIO_THRESHOLD
+         && spawnFrameCount >= PETAL_CONFIG.SPAWN_INTERVAL_FRAMES) {
+        spawnFrameCount = 0;
+
+        // 볼륨을 [THRESHOLD~1.0] → [0~1] 로 정규화
+        const t = (vol - PETAL_CONFIG.AUDIO_THRESHOLD)
+                / (1.0 - PETAL_CONFIG.AUDIO_THRESHOLD);
+
+        // 생성 확률: 작은 소리 → BASE_SPAWN_CHANCE, 큰 소리 → MAX_SPAWN_CHANCE
+        // t²로 가속 → 조용할 땐 거의 안 나오다가 크게 말할 때 폭발적으로 증가
+        const spawnChance = PETAL_CONFIG.BASE_SPAWN_CHANCE
+                          + (PETAL_CONFIG.MAX_SPAWN_CHANCE - PETAL_CONFIG.BASE_SPAWN_CHANCE)
+                          * (t * t);
+
+        if(Math.random() < spawnChance) {
+          // BURST_SPAWN_COUNT만큼 한 번에 생성
+          const burst = Math.min(
+            PETAL_CONFIG.BURST_SPAWN_COUNT,
+            PETAL_CONFIG.MAX_PETAL_COUNT - flyPetals.length
+          );
+          for(let b=0; b<burst; b++) spawnPetal(vol, liveColor, liveTintAmt);
+        }
+        // 황금 파티클은 꽃잎 궤적에서만 생성 (아래 petal loop 참고)
+      }
+      if(vol >= PETAL_CONFIG.AUDIO_THRESHOLD) emitBokeh(vol,fp);
 
       // ═══════════════════════════════════════════════════════════════════════
       // 꽃잎 물리 update()
@@ -527,12 +654,13 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         // 노이즈 비중 높이고 직선 바람 줄임
         const noiseAmp=p.windStr*(1.0+vol*0.7)*windT;
 
-        // ── 4. 주 바람: 우측 상단 25° 대각선, MAX_WIND_FORCE 적용 ────────
-        const STREAM_X=0.906, STREAM_Y=0.423;
+        // ── 4. 주 바람: TARGET_ANGLE 방향으로 고정, MAX_WIND_FORCE 적용 ──
+        const tRad=Math.abs(PETAL_CONFIG.TARGET_ANGLE)*Math.PI/180;
+        const STREAM_X=Math.cos(tRad), STREAM_Y=Math.sin(tRad);
         const windScale=PETAL_CONFIG.MAX_WIND_FORCE*(0.25+vol*0.75)*p.windStr;
         p.vx+=(STREAM_X*windScale + flow.x*noiseAmp*2.2)*dt;
-        p.vy+=(STREAM_Y*windScale*0.35 + flow.y*noiseAmp*1.6)*dt;
-        p.vz+=flow.z*noiseAmp*0.5*dt;
+        p.vy+=(STREAM_Y*windScale   + flow.y*noiseAmp*1.6)*dt;
+        p.vz=0; // ★ z축 고정 — vz 누적으로 원근 축소되는 현상 방지
 
         // ── 5. 소용돌이 ──────────────────────────────────────────────────────
         const vcx=fp.x+1.8, vcy=fp.y+0.8;
@@ -542,19 +670,18 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         p.vx+=(-dvy/vdist)*omega*dt;
         p.vy+=( dvx/vdist)*omega*dt;
 
-        // ── 6. 공기 저항 ──────────────────────────────────────────────────────
-        const drag=1.0-p.drag*dt;
+        // ── 6. 공기 저항 — FORCE_DAMPING 적용 ───────────────────────────────
+        const drag=Math.pow(PETAL_CONFIG.FORCE_DAMPING, dt*60);
         p.vx*=drag; p.vy*=drag; p.vz*=drag;
 
-        // ── 7. 좁은 스트림 채널 (반폭 1.5) ──────────────────────────────────
+        // ── 7. 스트림 채널 — STREAM_WIDTH로 폭 제한, 이탈 시 복원력 ─────────
         const PERP_X=-STREAM_Y, PERP_Y=STREAM_X;
         const relX=px-fp.x, relY=py-fp.y;
         const perpDist=relX*PERP_X+relY*PERP_Y;
-        const STREAM_HALF_W=1.5;
-        if(Math.abs(perpDist)>STREAM_HALF_W && windT>0.2){
-          const excess=perpDist-Math.sign(perpDist)*STREAM_HALF_W;
-          p.vx-=excess*PERP_X*3.0*dt;
-          p.vy-=excess*PERP_Y*3.0*dt;
+        if(Math.abs(perpDist)>PETAL_CONFIG.STREAM_WIDTH && windT>0.1){
+          const excess=perpDist-Math.sign(perpDist)*PETAL_CONFIG.STREAM_WIDTH;
+          p.vx-=excess*PERP_X*4.0*dt;
+          p.vy-=excess*PERP_Y*4.0*dt;
         }
 
         // ── 8. 역방향 댐핑 ───────────────────────────────────────────────────
@@ -593,25 +720,101 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         p.mat.uniforms["uTintAmount"].value=liveTintAmt*(1-agT*.7);
         p.mat.uniforms["uGlow"].value=.25+vol*.30+Math.sin(time*3.0+p.phase)*.05;
 
-        // ── 13. 황금 먼지 꼬리 ───────────────────────────────────────────────
-        if(windT>0.15 && Math.random()<0.35+vol*0.35)
-          emitGoldDust(px,py,pz,p.vx,p.vy,vol);
+        // ── 13. 꽃잎 궤적에서 황금 파티클 방출 ─────────────────────────────
+        if(windT>0.15 && Math.random()<0.20+vol*0.20)
+          spawnGoldSpark(px,py,pz,p.vx,p.vy,liveColor);
       }
 
-      // ─── 황금 먼지 업데이트 ─────────────────────────────────────────────
-      for(let i=0;i<MAX_DUST;i++){
-        if(dustAge[i]>=dustLife[i]){dustPos[i*3]=-1e4;dustPos[i*3+1]=-1e4;continue;}
-        dustAge[i]+=dt;
-        // 꽃잎보다 훨씬 노이즈에 민감, 중력 거의 없음
-        const curl=curlNoise(dustPos[i*3]*.16,dustPos[i*3+1]*.16,dustPos[i*3+2]*.12,time);
-        dustVel[i*3]*=0.82; dustVel[i*3+1]*=0.82; dustVel[i*3+2]*=0.82;
-        dustPos[i*3]  +=(dustVel[i*3]  +curl.x*1.4)*dt;
-        dustPos[i*3+1]+=(dustVel[i*3+1]+curl.y*1.4)*dt;
-        dustPos[i*3+2]+=(dustVel[i*3+2]+curl.z*0.7)*dt;
+      // ─── 황금 빛 파티클 업데이트 (꽃잎과 동일한 물리) ─────────────────
+      for(let i=goldSparks.length-1;i>=0;i--){
+        const s=goldSparks[i];
+        s.age+=dt;
+        const spx=s.mesh.position.x, spy=s.mesh.position.y, spz=s.mesh.position.z;
+
+        // 꽃잎과 동일한 제거 조건
+        if(spx>halfW_s*1.3 || spy>halfH_s*1.3 || s.age>=s.maxAge){
+          scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mat.dispose();
+          goldSparks.splice(i,1); continue;
+        }
+
+        // 1. 바람 ramp-up (꽃잎과 동일)
+        const sRaw=Math.max(0,(s.age-s.detachDur)/s.rampDur);
+        const swf=Math.min(sRaw,1.0);
+        const sWindT=swf*swf*(3-2*swf);
+
+        // 2. 중력
+        s.vy-=(0.025+sWindT*0.055)*dt;
+
+        // 3. curl noise — ★ 파티클 공유 필드(noiseOff 극소), 진폭 대폭 감소
+        const snx=spx*0.06+s.noiseOff.x+time*0.032;
+        const sny=spy*0.06+s.noiseOff.y+time*0.025;
+        const snz=spz*0.04+s.noiseOff.z+time*0.020;
+        const sFlow=curlNoise(snx,sny,snz,time);
+        const sNoiseAmp=s.windStr*(0.20+vol*0.20)*sWindT;  // ★ 1/5 수준으로 감소
+
+        // 4. 주 바람
+        const stRad=Math.abs(PETAL_CONFIG.TARGET_ANGLE)*Math.PI/180;
+        const sSX=Math.cos(stRad), sSY=Math.sin(stRad);
+        const sWindScale=PETAL_CONFIG.MAX_WIND_FORCE*(0.25+vol*0.75)*s.windStr;
+        s.vx+=(sSX*sWindScale+sFlow.x*sNoiseAmp*0.7)*dt;
+        s.vy+=(sSY*sWindScale+sFlow.y*sNoiseAmp*0.5)*dt;
+        s.vz+=sFlow.z*sNoiseAmp*0.15*dt;
+
+        // 5. 소용돌이 제거 (벌레 패턴 주원인 → 삭제)
+
+        // 6. 공기 저항
+        const sDrag=Math.pow(PETAL_CONFIG.FORCE_DAMPING,dt*60);
+        s.vx*=sDrag; s.vy*=sDrag; s.vz*=sDrag;
+
+        // 7. ★ 수직 속도 적극 감쇠 — 스트림 축만 보존, 수직 성분 80% 제거
+        const sPerpX=-sSY, sPerpY=sSX;
+        const perpVel=s.vx*sPerpX+s.vy*sPerpY;
+        s.vx-=perpVel*sPerpX*0.80;
+        s.vy-=perpVel*sPerpY*0.80;
+
+        // ★ 좁은 하드 채널 (STREAM_WIDTH의 1/4)
+        const sRelX=spx-fp.x, sRelY=spy-fp.y;
+        const sPerpDist=sRelX*sPerpX+sRelY*sPerpY;
+        const streamHalf=PETAL_CONFIG.STREAM_WIDTH*0.25;
+        if(Math.abs(sPerpDist)>streamHalf && sWindT>0.1){
+          const sExc=sPerpDist-Math.sign(sPerpDist)*streamHalf;
+          s.vx-=sExc*sPerpX*10.0*dt;
+          s.vy-=sExc*sPerpY*10.0*dt;
+        }
+
+        // 8. 역방향 댐핑
+        if(sWindT>0.3){
+          if(s.vx<-0.04) s.vx*=0.82;
+          if(s.vy<0.35*s.windStr-0.7) s.vy*=0.86;
+        }
+
+        // 9. 위치 이동
+        s.mesh.position.x+=s.vx*dt;
+        s.mesh.position.y+=s.vy*dt;
+        s.mesh.position.z+=s.vz*dt;
+
+        // 9.5. ★ 사인파 웨이브 — phase 분산 0.3배로 줄여 함께 출렁이게
+        s.mesh.position.y += Math.cos(
+          s.mesh.position.x * PETAL_CONFIG.PARTICLE_WAVE_FREQUENCY
+          + time * PETAL_CONFIG.PARTICLE_WAVE_SPEED
+          + s.phase        // 알갱이마다 엇박자 → 유기적인 S자 띠
+        ) * PETAL_CONFIG.PARTICLE_WAVE_AMPLITUDE * 0.006 * dt;
+
+        // 10-11. 회전 (noise 기반 pitch/yaw + roll sway)
+        const stgtPitch=NA(snx*1.2,sny*1.2,snz*1.2)*PETAL_CONFIG.X_ROTATION_SPEED*8;
+        const stgtYaw  =NB(snx*1.2,sny*1.2,snz*1.2)*PETAL_CONFIG.Y_ROTATION_SPEED*6;
+        s.pitchVel+=(stgtPitch-s.pitchVel)*Math.min(dt*0.30,1);
+        s.yawVel  +=(stgtYaw  -s.yawVel  )*Math.min(dt*0.24,1);
+        s.pitchVel*=0.97; s.yawVel*=0.97;
+        s.mesh.rotation.x+=s.pitchVel*dt;
+        s.mesh.rotation.y+=s.yawVel*dt;
+        const sBaseRad=PETAL_CONFIG.BASE_ANGLE*Math.PI/180;
+        s.mesh.rotation.z=sBaseRad+s.rollAmp*Math.sin(s.rollFreq*s.age+s.phase);
+
+        // 반짝임 맥동: 0.28~0.52 범위 — 꽃잎보다 은은하게
+        s.mat.opacity=0.40+Math.sin(time*5.0+s.phase)*.12;
+        s.mat.color.set(0xffd700); s.mat.color.lerp(liveColor,.25);
       }
-      dustGeo.attributes.position.needsUpdate=true;
-      dustMat.opacity=.65+vol*.30+Math.sin(time*9)*.04;
-      dustMat.color.set(0xffd060); dustMat.color.lerp(liveColor,.22);
 
       // ─── 보케 업데이트 ──────────────────────────────────────────────────
       for(let i=0;i<MAX_BK;i++){
@@ -640,7 +843,8 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       if(animRef.current) cancelAnimationFrame(animRef.current);
       petalGeo.dispose(); petalTex.dispose();
       flyPetals.forEach(({mesh,mat})=>{mesh.geometry.dispose();mat.dispose();});
-      dustGeo.dispose(); dustMat.dispose(); goldTex.dispose();
+      goldSparks.forEach(({mesh,mat})=>{mesh.geometry.dispose();mat.dispose();});
+      sparkBaseGeo.dispose(); sparkTex.dispose();
       bkGeo.dispose(); bkMat.dispose(); bokehTex.dispose();
       if(container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
       renderer.dispose();
