@@ -838,10 +838,11 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
     const ro=new ResizeObserver(entries=>{
       const{width:w,height:h}=entries[0].contentRect;
       renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
-      // 전체화면 전환 시 꽃 메시가 잘리지 않도록 가로 비율에 맞게 스케일 보정
+      // 전체화면 전환 시 꽃 메시가 잘리지 않도록 스케일 보정
+      // Math.max(0.9,...) 로 세로 커버리지 항상 보장
       if(flowerMesh){
         const newHalfW=Math.tan((camera.fov*Math.PI/180)/2)*camera.position.z*(w/h);
-        const s=0.9*(newHalfW/flowerInitHalfW);
+        const s=Math.max(0.9, 0.9*(newHalfW/flowerInitHalfW));
         flowerMesh.scale.setScalar(s);
       }
     });
