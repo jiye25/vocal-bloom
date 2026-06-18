@@ -40,7 +40,7 @@ const PETAL_CONFIG = {
 
   AUDIO_THRESHOLD:    0.12,  // 꽃잎 생성 시작 최소 볼륨 (0~1) — 소음 차단
   MAX_WIND_FORCE:     1.0,   // 최대 볼륨 시 바람 세기 승수
-  MAX_PETAL_COUNT:    17,    // 화면 내 최대 꽃잎 수
+  MAX_PETAL_COUNT:    21,    // 화면 내 최대 꽃잎 수
 
   // ★ 꽃잎 초기 방출 방향 (3시 방향 = 0°, 12시 = 90°)
   SPAWN_DIRECTION_ANGLE:    0,     // 생성 첫 프레임 방출 각도 (도)
