@@ -43,7 +43,7 @@ const PETAL_CONFIG = {
   MAX_PETAL_COUNT:    17,    // 화면 내 최대 꽃잎 수
 
   // ★ 꽃잎 초기 방출 방향 (3시 방향 = 0°, 12시 = 90°)
-  SPAWN_DIRECTION_ANGLE:    -20,   // 생성 첫 프레임 방출 각도 (도)
+  SPAWN_DIRECTION_ANGLE:    0,     // 생성 첫 프레임 방출 각도 (도)
   INITIAL_SPAWN_SPEED:      1.5,   // 초기 속도 세기 배율 (1.0 = 기본)
 
   // ★ 꽃잎 생성 양/빈도 제어
@@ -659,7 +659,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         const noiseAmp=p.windStr*(1.0+vol*0.7)*windT;
 
         // ── 4. 주 바람: TARGET_ANGLE 방향으로 고정, MAX_WIND_FORCE 적용 ──
-        const tRad=PETAL_CONFIG.TARGET_ANGLE*Math.PI/180;
+        const tRad=Math.abs(PETAL_CONFIG.TARGET_ANGLE)*Math.PI/180;
         const STREAM_X=Math.cos(tRad), STREAM_Y=Math.sin(tRad);
         const windScale=PETAL_CONFIG.MAX_WIND_FORCE*(0.25+vol*0.75)*p.windStr;
         p.vx+=(STREAM_X*windScale + flow.x*noiseAmp*2.2)*dt;
@@ -757,7 +757,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         const sNoiseAmp=s.windStr*(0.20+vol*0.20)*sWindT;  // ★ 1/5 수준으로 감소
 
         // 4. 주 바람
-        const stRad=PETAL_CONFIG.TARGET_ANGLE*Math.PI/180;
+        const stRad=Math.abs(PETAL_CONFIG.TARGET_ANGLE)*Math.PI/180;
         const sSX=Math.cos(stRad), sSY=Math.sin(stRad);
         const sWindScale=PETAL_CONFIG.MAX_WIND_FORCE*(0.25+vol*0.75)*s.windStr;
         s.vx+=(sSX*sWindScale+sFlow.x*sNoiseAmp*0.7)*dt;
