@@ -9,7 +9,7 @@ const EMOTION_COLORS: Record<keyof EmotionScores, THREE.Color> = {
   joy:        new THREE.Color(0.981, 0.949, 0.367),
   sadness:    new THREE.Color(0.319, 0.489, 0.595),
   excitement: new THREE.Color(0.767, 0.976, 0.903),
-  gratitude:  new THREE.Color(1.000, 0.718, 0.400),
+  gratitude:  new THREE.Color(1.000, 0.540, 0.200),
 };
 const WHITE = new THREE.Color(1, 1, 1);
 
