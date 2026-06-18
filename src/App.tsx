@@ -40,7 +40,7 @@ export default function App() {
 
   // ── 서버 상태 확인 ──────────────────────────────────────────────────────────
   useEffect(() => {
-    fetch("/api/../health").then(r => r.ok ? setServerOk(true) : setServerOk(false))
+    fetch("/api/health").then(r => r.ok ? setServerOk(true) : setServerOk(false))
       .catch(() => setServerOk(false));
   }, []);
 
