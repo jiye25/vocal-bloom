@@ -694,6 +694,9 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
           if(p.vy<0.35*p.windStr-0.7) p.vy*=0.86;
         }
 
+        // ── 8.5. 왼쪽 1/3 구역에서 위쪽 속도 억제 (12시 방향 차단)
+        if(px < -halfW_s/3 && p.vy > 0) p.vy *= 0.75;
+
         // ── 9. 위치 이동 ──────────────────────────────────────────────────────
         p.mesh.position.x+=p.vx*dt;
         p.mesh.position.y+=p.vy*dt;
