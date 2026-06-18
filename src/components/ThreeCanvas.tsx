@@ -208,7 +208,7 @@ const FRAG=/* glsl */`
     vec3 grey=vec3(luma);
     // 2단계: 그레이스케일 * 틴트 → 정확한 색상 재현
     // grey 승수 낮추고 순수 tint 가산량 증가 → 밝은 픽셀에서도 채도 유지
-    vec3 tinted=clamp(grey*uTint*0.90+uTint*0.55, 0.0, 1.0);
+    vec3 tinted=clamp(uTint*(luma*0.85+0.30), 0.0, 1.0);
     col=mix(col,tinted,uTintAmount);
     float fr=pow(1.0-max(dot(vNorm,vView),0.0),2.5);
     col+=mix(vec3(1.0),uTint,uTintAmount)*fr*(0.35+uGlow*1.2);
@@ -403,7 +403,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
 
       // 초기 속도: SPAWN_DIRECTION_ANGLE(3시=0°) 방향으로 출발
       const spawnRad=PETAL_CONFIG.SPAWN_DIRECTION_ANGLE*Math.PI/180;
-      const initSpd=(0.04+Math.random()*0.03)*PETAL_CONFIG.INITIAL_SPAWN_SPEED;
+      const initSpd=(0.08+Math.random()*0.04)*PETAL_CONFIG.INITIAL_SPAWN_SPEED;
       flyPetals.push({
         mesh, mat,
         vx: Math.cos(spawnRad)*initSpd,
@@ -414,8 +414,8 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         rollAmp:PETAL_CONFIG.Z_ROTATION_SPEED*(0.8+Math.random()*0.4),
         rollFreq:0.18+Math.random()*0.14,
         drag:0.7+Math.random()*0.30,
-        detachDur:0,       // 즉시 바람 적용
-        rampDur:0.5+Math.random()*0.4,
+        detachDur:0,
+        rampDur:0.15+Math.random()*0.15,
         windStr:0.60+Math.random()*0.40,
         vortexSign:Math.random()>0.5?1:-1,
         noiseOff:new THREE.Vector3(Math.random()*100,Math.random()*100,Math.random()*100),
