@@ -842,7 +842,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       // Math.max(0.9,...) 로 세로 커버리지 항상 보장
       if(flowerMesh){
         const newHalfW=Math.tan((camera.fov*Math.PI/180)/2)*camera.position.z*(w/h);
-        const s=Math.max(0.9, 0.9*(newHalfW/flowerInitHalfW));
+        const s=Math.max(0.9, newHalfW/flowerInitHalfW);
         flowerMesh.scale.setScalar(s);
       }
     });
