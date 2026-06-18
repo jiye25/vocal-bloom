@@ -838,12 +838,13 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
     const ro=new ResizeObserver(entries=>{
       const{width:w,height:h}=entries[0].contentRect;
       renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
-      // 전체화면 전환 시 꽃 메시가 잘리지 않도록 스케일 보정
-      // Math.max(0.9,...) 로 세로 커버리지 항상 보장
+      // 전체화면 전환 시 꽃 메시 지오메트리를 현재 뷰포트 크기로 재생성
       if(flowerMesh){
-        const newHalfW=Math.tan((camera.fov*Math.PI/180)/2)*camera.position.z*(w/h);
-        const s=Math.max(0.9, newHalfW/flowerInitHalfW);
-        flowerMesh.scale.setScalar(s);
+        const halfH_cam=Math.tan((camera.fov*Math.PI/180)/2)*camera.position.z;
+        const newHalfW=halfH_cam*(w/h);
+        flowerMesh.geometry.dispose();
+        flowerMesh.geometry=new THREE.PlaneGeometry(newHalfW*2, halfH_cam*2);
+        flowerMesh.scale.setScalar(0.9);
       }
     });
     ro.observe(container);
