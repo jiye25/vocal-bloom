@@ -382,7 +382,8 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       const fp=getFlowerPos();
 
       // 도넛 타원 스폰 — 수술 중심부 완전 제외
-      const spAngle=Math.random()*Math.PI*2;
+      // 12시 방향 침범 방지: 상단 호(45°~135°) 제외, 나머지 270° 범위에서만 스폰
+      const spAngle=(Math.PI*3/4)+Math.random()*(Math.PI*3/2);
       const r=PETAL_CONFIG.SPAWN_RADIUS_MIN
              +Math.random()*(PETAL_CONFIG.SPAWN_RADIUS_MAX-PETAL_CONFIG.SPAWN_RADIUS_MIN);
       mesh.position.set(
