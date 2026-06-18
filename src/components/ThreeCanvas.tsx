@@ -328,7 +328,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       });
       const vMesh=new THREE.Mesh(vGeo,vMat);
       vMesh.renderOrder=10;
-      vMesh.position.set(-1.3,-0.90,0.1);
+      vMesh.position.set(-1.7,-0.90,0.1);
       vMesh.scale.setScalar(0.9);
       scene.add(vMesh);
       flowerMesh=vMesh;
