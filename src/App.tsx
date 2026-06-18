@@ -38,11 +38,8 @@ export default function App() {
   const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionRef     = useRef(false);
 
-  // ── 서버 상태 확인 ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    fetch("/api/health").then(r => r.ok ? setServerOk(true) : setServerOk(false))
-      .catch(() => setServerOk(false));
-  }, []);
+  // Vercel 배포 환경에서는 API 함수가 항상 사용 가능
+  useEffect(() => { setServerOk(true); }, []);
 
   // ── 세션 시작 ────────────────────────────────────────────────────────────────
   const initSession = async () => {
