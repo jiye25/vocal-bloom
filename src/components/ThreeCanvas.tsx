@@ -296,9 +296,11 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
     const videoTex=new THREE.VideoTexture(videoEl);
     videoTex.minFilter=THREE.LinearFilter;
     videoTex.magFilter=THREE.LinearFilter;
+    const flowerInitHalfW=Math.tan((camera.fov*Math.PI/180)/2)*camera.position.z*(W/H);
+    let flowerMesh:THREE.Mesh|null=null;
     const flowerMat = (() => {
       const halfH=Math.tan((camera.fov*Math.PI/180)/2)*camera.position.z;
-      const halfW=halfH*(W/H);
+      const halfW=flowerInitHalfW;
       const vGeo=new THREE.PlaneGeometry(halfW*2,halfH*2);
       const vMat=new THREE.ShaderMaterial({
         uniforms:{
@@ -329,6 +331,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       vMesh.position.set(-1.3,-0.90,0.1);
       vMesh.scale.setScalar(0.9);
       scene.add(vMesh);
+      flowerMesh=vMesh;
       return vMat;
     })();
 
@@ -835,6 +838,12 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
     const ro=new ResizeObserver(entries=>{
       const{width:w,height:h}=entries[0].contentRect;
       renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
+      // 전체화면 전환 시 꽃 메시가 잘리지 않도록 가로 비율에 맞게 스케일 보정
+      if(flowerMesh){
+        const newHalfW=Math.tan((camera.fov*Math.PI/180)/2)*camera.position.z*(w/h);
+        const s=0.9*(newHalfW/flowerInitHalfW);
+        flowerMesh.scale.setScalar(s);
+      }
     });
     ro.observe(container);
 
