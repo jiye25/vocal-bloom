@@ -12,7 +12,8 @@ export default async function handler(req, res) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const prompt = `다음 한국어 문장에서 6가지 감정의 강도를 분석하여 JSON으로만 응답하세요.
-값은 0.0~1.0 사이 실수, 합계가 1.0이 되도록 하세요. 감정이 없으면 0.
+값은 0.0~1.0 사이 실수입니다. 감정이 명확하게 느껴지지 않으면 해당 항목은 반드시 0.0으로 하세요.
+일상적인 말, 단순 정보 전달, 감정 없는 문장이면 전부 0.0으로 응답하세요.
 반드시 JSON 한 줄만 출력하세요. 다른 텍스트, 마크다운, 코드블록 없이.
 
 감정: love(사랑/애정), longing(그리움/추억), joy(기쁨/행복), sadness(슬픔/우울/미안함/사과/후회), excitement(설렘/기대), gratitude(감사/뿌듯함)
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
       total += parsed[k];
     });
 
-    if (total < 0.01) return res.json(NEUTRAL);
+    if (total < 0.30) return res.json(NEUTRAL);
     KEYS.forEach(k => { parsed[k] = parsed[k] / total; });
     return res.json(parsed);
 

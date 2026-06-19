@@ -550,7 +550,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         const w=emo[k]; wSum+=w;
         if(w>dominantW){ dominantW=w; dominantKey=k; }
       });
-      const hasEmo=dominantW>.08 && dominantKey!=null;
+      const hasEmo=dominantW>.25 && dominantKey!=null;
       if(hasEmo){
         goalColor.copy(EMOTION_COLORS[dominantKey!]);
         goalTintAmt=1.0; afterglow=0;
