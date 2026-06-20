@@ -55,7 +55,7 @@ const PETAL_CONFIG = {
   IDLE_SPAWN_INTERVAL:      3.5,   // 무음 시 꽃잎 자동 생성 간격 (초)
 
   // ★ 감정 인식 시 최소 보장 꽃잎 개수
-  MIN_EMOTION_SPAWN_COUNT:  5,     // 짧은 발화에도 최소 이 수만큼 즉시 생성
+  MIN_EMOTION_SPAWN_COUNT:  8,     // 짧은 발화에도 최소 이 수만큼 즉시 생성
 
   // ★ 황금 빛 파티클 — 얇은 황금 띠(은하수) 연출
   PARTICLE_MAX_COUNT:       120,
