@@ -40,17 +40,17 @@ const PETAL_CONFIG = {
 
   AUDIO_THRESHOLD:    0.12,  // 꽃잎 생성 시작 최소 볼륨 (0~1) — 소음 차단
   MAX_WIND_FORCE:     1.0,   // 최대 볼륨 시 바람 세기 승수
-  MAX_PETAL_COUNT:    21,    // 화면 내 최대 꽃잎 수
+  MAX_PETAL_COUNT:    28,    // 화면 내 최대 꽃잎 수
 
   // ★ 꽃잎 초기 방출 방향 (3시 방향 = 0°, 12시 = 90°)
   SPAWN_DIRECTION_ANGLE:    0,     // 생성 첫 프레임 방출 각도 (도)
   INITIAL_SPAWN_SPEED:      1.5,   // 초기 속도 세기 배율 (1.0 = 기본)
 
   // ★ 꽃잎 생성 양/빈도 제어
-  SPAWN_INTERVAL_FRAMES:    5,     // N프레임마다 스폰 체크 (낮을수록 더 자주)
-  BASE_SPAWN_CHANCE:        0.08,  // 볼륨 최저(임계값)일 때 생성 확률 → 몇 초에 한 장
-  MAX_SPAWN_CHANCE:         0.85,  // 볼륨 최대(1.0)일 때 생성 확률 → 화르륵 무더기
-  BURST_SPAWN_COUNT:        1.5,   // 조건 충족 시 한 번에 생성할 꽃잎 수
+  SPAWN_INTERVAL_FRAMES:    4,     // N프레임마다 스폰 체크 (낮을수록 더 자주)
+  BASE_SPAWN_CHANCE:        0.14,  // 볼륨 최저(임계값)일 때 생성 확률 → 몇 초에 한 장
+  MAX_SPAWN_CHANCE:         0.95,  // 볼륨 최대(1.0)일 때 생성 확률 → 화르륵 무더기
+  BURST_SPAWN_COUNT:        2.5,   // 조건 충족 시 한 번에 생성할 꽃잎 수
 
   IDLE_SPAWN_INTERVAL:      3.5,   // 무음 시 꽃잎 자동 생성 간격 (초)
 
