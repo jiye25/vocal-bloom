@@ -6,7 +6,7 @@ import type { EmotionScores } from "../types";
 const EMOTION_COLORS: Record<keyof EmotionScores, THREE.Color> = {
   love:       new THREE.Color(0.917, 0.693, 0.798),
   longing:    new THREE.Color(0.739, 0.690, 0.909),
-  joy:        new THREE.Color(0.981, 0.949, 0.367),
+  joy:        new THREE.Color(0.963, 0.938, 0.472),
   sadness:    new THREE.Color(0.557, 0.668, 0.737),
   excitement: new THREE.Color(0.767, 0.976, 0.903),
   gratitude:  new THREE.Color(1.000, 0.720, 0.520),
@@ -390,7 +390,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
              +Math.random()*(PETAL_CONFIG.SPAWN_RADIUS_MAX-PETAL_CONFIG.SPAWN_RADIUS_MIN);
       mesh.position.set(
         fp.x+Math.cos(spAngle)*r*1.20,
-        fp.y+Math.sin(spAngle)*r*0.65,
+        fp.y+Math.sin(spAngle)*r*0.65+0.35,
         (Math.random()-.5)*0.1,
       );
 
