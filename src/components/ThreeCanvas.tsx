@@ -318,9 +318,9 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
             vec4 c=texture2D(uVideo,vUv);
             float lum=dot(c.rgb,vec3(0.299,0.587,0.114));
             if(lum<0.06) discard;
-            // 노란 수술 영역: R·G 높고 B 낮음 → 틴트 제외
+            // 노란 수술 영역: R·G 높고 B 낮음 → 틴트 거의 완전 제외
             float yellowness = (c.r + c.g - 2.0*c.b) * 0.5;
-            float mask = clamp(1.0 - yellowness * 3.0, 0.0, 1.0);
+            float mask = clamp(1.0 - yellowness * 6.0, 0.0, 1.0);
             vec3 col=mix(c.rgb, uTint*(lum*0.85+0.30), uTintAmount*0.75*mask);
             gl_FragColor=vec4(col,c.a);
           }`,
