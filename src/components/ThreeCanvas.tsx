@@ -422,7 +422,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         windStr:0.60+Math.random()*0.40,
         vortexSign:Math.random()>0.5?1:-1,
         noiseOff:new THREE.Vector3(Math.random()*100,Math.random()*100,Math.random()*100),
-        age:0, maxAge:60,
+        age:0, maxAge:18,
         scale:s, phase:Math.random()*Math.PI*2,
       });
     }
@@ -695,6 +695,9 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
           if(p.vx<-0.04) p.vx*=0.82;
           if(p.vy<0.35*p.windStr-0.7) p.vy*=0.86;
         }
+
+        // ── 8.4. 제자리 정체 방지 — 최소 전진 속도 보장 ────────────────────
+        if(windT>0.4) p.vx=Math.max(p.vx,0.06*p.windStr);
 
         // ── 8.5. 왼쪽 1/3 구역에서 위쪽 속도 억제 (12시 방향 차단)
         if(px < -halfW_s/3 && p.vy > 0) p.vy *= 0.75;
