@@ -1,37 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import ThreeCanvas from "./components/ThreeCanvas";
 import type { EmotionScores } from "./types";
-import { Sparkles, Speech } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 const INITIAL_EMOTIONS: EmotionScores = {
   love: 0, longing: 0, joy: 0,
   sadness: 0, excitement: 0, gratitude: 0,
 };
 
-const EMOTION_LABEL: Record<keyof EmotionScores, string> = {
-  love: "사랑", longing: "그리움", joy: "기쁨",
-  sadness: "슬픔", excitement: "설렘", gratitude: "감사",
-};
-
-const EMOTION_COLOR: Record<keyof EmotionScores, string> = {
-  love: "#F2ACCD", longing: "#BDAEF2", joy: "#FFF540",
-  sadness: "#4A7FA0", excitement: "#BCFDE6", gratitude: "#F2AC54",
-};
-
-function getDominantEmotion(scores: EmotionScores): keyof EmotionScores | null {
-  const keys = Object.keys(scores) as (keyof EmotionScores)[];
-  const best = keys.reduce((a, b) => scores[a] > scores[b] ? a : b);
-  return scores[best] > 0.15 ? best : null;
-}
-
 export default function App() {
   const [welcomeScreen, setWelcomeScreen] = useState(true);
   const [volume, setVolume]               = useState(0);
   const [emotionScores, setEmotionScores] = useState<EmotionScores>(INITIAL_EMOTIONS);
-  const [transcript, setTranscript]       = useState("");
-  const [interimText, setInterimText]     = useState("");
-  const [isListening, setIsListening]     = useState(false);
-  const [isAnalyzing, setIsAnalyzing]     = useState(false);
   const [serverOk, setServerOk]           = useState<boolean | null>(null);
 
   const volumeLoopRef  = useRef<number | null>(null);
@@ -91,12 +71,10 @@ export default function App() {
 
     rec.onstart = () => {
       console.log("[SR] 인식 시작 ✅");
-      setIsListening(true);
     };
 
     rec.onerror = (e: any) => {
       console.error("[SR] 오류:", e.error);
-      setIsListening(false);
       if (e.error === "not-allowed") {
         sessionRef.current = false;
         alert("마이크 권한이 차단됐습니다.\nChrome 설정 → 개인정보 보호 → 마이크에서 이 사이트 허용");
@@ -105,7 +83,6 @@ export default function App() {
 
     rec.onend = () => {
       console.log("[SR] 인식 종료 — 재시작 예약");
-      setIsListening(false);
       if (sessionRef.current) {
         setTimeout(() => {
           try { rec.start(); console.log("[SR] 재시작 ✅"); }
@@ -115,20 +92,13 @@ export default function App() {
     };
 
     rec.onresult = (e: any) => {
-      let interim = "", final = "";
+      let final = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
         if (e.results[i].isFinal) { final += t; }
-        else { interim += t; }
-      }
-      if (interim) {
-        console.log("[SR] 중간:", interim);
-        setInterimText(interim);
       }
       if (final) {
         console.log("[SR] 최종:", final);
-        setInterimText("");
-        setTranscript(final.trim());
         analyzeEmotion(final.trim());
       }
     };
@@ -143,7 +113,6 @@ export default function App() {
   // ── 감정 분석 ────────────────────────────────────────────────────────────────
   const analyzeEmotion = async (text: string) => {
     if (!text) return;
-    setIsAnalyzing(true);
     try {
       const res = await fetch("/api/analyze-emotion", {
         method: "POST",
@@ -160,8 +129,6 @@ export default function App() {
       }
     } catch (err) {
       console.error("[색상] 네트워크 오류:", err);
-    } finally {
-      setIsAnalyzing(false);
     }
   };
 
@@ -173,9 +140,6 @@ export default function App() {
   };
 
 
-
-  // ── 현재 지배 감정 ───────────────────────────────────────────────────────────
-  const dominant = getDominantEmotion(emotionScores);
 
   return (
     <div className="w-screen h-screen relative select-none overflow-hidden text-white"
@@ -219,61 +183,12 @@ export default function App() {
       {/* ── 실행 중 UI ── */}
       {!welcomeScreen && (
         <>
-          {/* 마이크 상태 */}
-          <div className="absolute top-6 right-6 flex items-center gap-2 pointer-events-none"
-               style={{ opacity: 0.6 }}>
-            <div className={`w-2 h-2 rounded-full transition-colors ${isListening ? "bg-emerald-400" : "bg-white/30"}`}
-                 style={isListening ? { boxShadow:"0 0 8px rgba(52,211,153,0.8)", animation:"pulse 1.5s infinite" } : {}} />
-            <span className="text-[10px] font-mono tracking-widest uppercase text-white/50">
-              {isListening ? "LISTENING" : "STANDBY"}
-            </span>
-          </div>
-
           {/* 서버 상태 */}
           {serverOk === false && (
             <div className="absolute top-6 left-6 text-[9px] font-mono text-red-400/70 pointer-events-none">
               ⚠ 서버 미연결
             </div>
           )}
-
-          {/* 인식 텍스트 + 감정 표시 */}
-          <div className="absolute bottom-8 left-1/2 pointer-events-none z-30 flex flex-col items-center gap-2"
-               style={{ transform: "translateX(-50%)", minWidth: "280px" }}>
-
-            {/* 중간 인식 결과 (흐리게) */}
-            {interimText && (
-              <p className="text-xs text-white/35 font-light tracking-wide italic">
-                {interimText}
-              </p>
-            )}
-
-            {/* 최종 텍스트 + 감정 칩 */}
-            {transcript && (
-              <div className="flex flex-col items-center gap-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Speech className="w-3 h-3 text-white/30" />
-                  <p className="text-sm font-light text-white/80 tracking-wide px-5 py-1.5 rounded-full"
-                     style={{ border:"1px solid rgba(255,255,255,0.10)",
-                              background:"rgba(0,0,0,0.40)", backdropFilter:"blur(6px)" }}>
-                    "{transcript}"
-                  </p>
-                  {isAnalyzing && (
-                    <span className="text-[9px] font-mono text-white/40 animate-pulse">분석중…</span>
-                  )}
-                </div>
-
-                {/* 지배 감정 칩 */}
-                {dominant && (
-                  <span className="text-[10px] font-mono tracking-widest px-3 py-0.5 rounded-full"
-                        style={{ background: EMOTION_COLOR[dominant] + "33",
-                                 border: `1px solid ${EMOTION_COLOR[dominant]}55`,
-                                 color: EMOTION_COLOR[dominant] }}>
-                    {EMOTION_LABEL[dominant]}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
         </>
       )}
     </div>
