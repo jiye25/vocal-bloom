@@ -397,16 +397,28 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
 
       // 도넛 타원 스폰 — 수술 중심부 완전 제외
       // 12시(60°~120°)·6시(210°~330°) 제외 → 좌측 호(120°~210°) 또는 우측 호(330°~420°)
-      const spAngle = Math.random() < 0.5
-        ? (Math.PI * 2/3)  + Math.random() * (Math.PI * 0.5)   // 120°~210° (9~6시)
-        : (Math.PI * 11/6) + Math.random() * (Math.PI * 0.5);  // 330°~420° (3~2시)
-      const r=PETAL_CONFIG.SPAWN_RADIUS_MIN
-             +Math.random()*(PETAL_CONFIG.SPAWN_RADIUS_MAX-PETAL_CONFIG.SPAWN_RADIUS_MIN);
-      mesh.position.set(
-        fp.x+Math.cos(spAngle)*r*1.20,
-        fp.y+Math.sin(spAngle)*r*0.65+0.35,
-        (Math.random()-.5)*0.1,
-      );
+      // ★ 겹침 방지: 후보 여러 개 뽑아서 기존 꽃잎과 가장 안 겹치는 위치 선택
+      const MIN_SPACING=PETAL_CONFIG.BASE_SIZE*0.55;
+      let bestX=0, bestY=0, bestMinDist=-1;
+      for(let attempt=0;attempt<6;attempt++){
+        const spAngle = Math.random() < 0.5
+          ? (Math.PI * 2/3)  + Math.random() * (Math.PI * 0.5)   // 120°~210° (9~6시)
+          : (Math.PI * 11/6) + Math.random() * (Math.PI * 0.5);  // 330°~420° (3~2시)
+        const r=PETAL_CONFIG.SPAWN_RADIUS_MIN
+               +Math.random()*(PETAL_CONFIG.SPAWN_RADIUS_MAX-PETAL_CONFIG.SPAWN_RADIUS_MIN);
+        const cx=fp.x+Math.cos(spAngle)*r*1.20;
+        const cy=fp.y+Math.sin(spAngle)*r*0.65+0.35;
+        let minDist=Infinity;
+        for(const op of flyPetals){
+          const ddx=cx-op.mesh.position.x, ddy=cy-op.mesh.position.y;
+          const d=Math.sqrt(ddx*ddx+ddy*ddy);
+          if(d<minDist) minDist=d;
+        }
+        if(flyPetals.length===0) minDist=Infinity;
+        if(minDist>bestMinDist){ bestMinDist=minDist; bestX=cx; bestY=cy; }
+        if(minDist>=MIN_SPACING) break; // 충분히 떨어진 위치를 찾았으면 즉시 채택
+      }
+      mesh.position.set(bestX, bestY, (Math.random()-.5)*0.1);
 
       // 기본 자세: BASE_ANGLE 기울기, pitch/yaw는 0
       const baseRad=PETAL_CONFIG.BASE_ANGLE*Math.PI/180;
