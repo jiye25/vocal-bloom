@@ -32,7 +32,7 @@ const PETAL_CONFIG = {
   STREAM_WIDTH:        0.9,   // 꽃·꼭지점 직선 기준 허용 상하 두께 (Three.js 월드 단위)
   RANDOM_DRIFT_FORCE:  0.05,  // 사방으로 흩어지게 만드는 난류(노이즈)의 최대 세기 (최소화)
   CENTER_PULL_FORCE:   0.04,  // 우측 상단 꼭지점으로 꽃잎을 모아 끌고 가는 인력 세기
-  MIN_X_VELOCITY:      0.55,  // 중간에 멈추는 현상을 막는 최소 오른쪽 전진 속도
+  MIN_X_VELOCITY:      0.95,  // 중간에 멈추는 현상을 막는 최소 오른쪽 전진 속도
   FORCE_DAMPING:       0.97,  // 관성을 부드럽게 만드는 감쇠율 (낮을수록 끈끈한 유체감)
 
   X_ROTATION_SPEED:   0.2,   // X축 앞뒤 까딱임 강도 (Pitch)
