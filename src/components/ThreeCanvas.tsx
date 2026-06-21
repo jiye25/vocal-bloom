@@ -26,14 +26,15 @@ const PETAL_CONFIG = {
 
   BASE_ANGLE:        -25,    // 생성 시 기본 Z 회전 각도 (도)
 
-  // ── 동선 제어: 우측 상단 꼭지점을 향한 우아한 질주를 위한 핵심 변수 ──────
+  // ── 동선 제어: 우측 상단 "영역"으로 풍성하게 퍼지는 흐름을 위한 변수 ──────
   TARGET_X:            0.95,  // 최종 목적지 X (화면 절반 너비 비율, 1.0=정확히 우측 끝)
-  TARGET_Y:            0.85,  // 최종 목적지 Y (화면 절반 높이 비율, 1.0=정확히 상단 끝)
-  STREAM_WIDTH:        1.5,   // 꽃·꼭지점 직선 기준 허용 상하 두께 (Three.js 월드 단위)
+  TARGET_Y:            0.85,  // 목적지 영역의 위쪽 기준선 (화면 절반 높이 비율)
+  TARGET_Y_RANGE:      0.35,  // 꽃잎마다 목적지를 이 범위 안에서 랜덤 분산 (압착 방지)
+  STREAM_WIDTH:        1.5,   // 개별 궤도 직선 기준 허용 상하 두께 (Three.js 월드 단위)
   RANDOM_DRIFT_FORCE:  0.05,  // 사방으로 흩어지게 만드는 난류(노이즈)의 최대 세기 (최소화)
-  CENTER_PULL_FORCE:   0.02,  // 우측 상단 꼭지점으로 꽃잎을 모아 끌고 가는 인력 세기
+  CENTER_PULL_FORCE:   0.012, // 인력을 대폭 줄여 깔때기(블랙홀) 현상 방지
   MIN_X_VELOCITY:      0.95,  // 중간에 멈추는 현상을 막는 최소 오른쪽 전진 속도
-  FORCE_DAMPING:       1,     // 관성을 부드럽게 만드는 감쇠율 (낮을수록 끈끈한 유체감)
+  FORCE_DAMPING:       0.98,  // 관성을 더 부드럽게 — 직선이 아닌 곡선 흐름 강화
 
   X_ROTATION_SPEED:   0.2,   // X축 앞뒤 까딱임 강도 (Pitch)
   Y_ROTATION_SPEED:   0.45,  // Y축 좌우 돌림 강도 (Yaw)
@@ -381,6 +382,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       noiseOff:THREE.Vector3;               // 개별 노이즈 오프셋
       age:number; maxAge:number;
       scale:number; phase:number;
+      dirX:number; dirY:number;             // 개별 목적지로 향하는 고정 방향 (압착 방지)
     }
     const flyPetals:FlyPetal[]=[];
     const MAX_FLY=PETAL_CONFIG.MAX_PETAL_COUNT;
@@ -416,9 +418,13 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       mesh.renderOrder=1;
       scene.add(mesh);
 
-      // 초기 속도: 태어난 즉시 우측 상단 꼭지점 방향으로 발사 (12시 솟구침 원천 차단)
+      // ★ 개별 목적지: 우측 상단 "영역"(TARGET_Y_RANGE) 내에서 꽃잎마다 다른 좌표를 가짐
+      // → 전부 한 점으로 압착되는 블랙홀 현상 방지, 자연스럽게 넓게 퍼짐
       const corner0=getTargetCorner();
-      const toCX=corner0.x-mesh.position.x, toCY=corner0.y-mesh.position.y;
+      const halfH0=corner0.y/PETAL_CONFIG.TARGET_Y; // 화면 절반 높이 역산
+      const myTargetX=corner0.x;
+      const myTargetY=corner0.y-Math.random()*PETAL_CONFIG.TARGET_Y_RANGE*halfH0;
+      const toCX=myTargetX-mesh.position.x, toCY=myTargetY-mesh.position.y;
       const toCLen=Math.sqrt(toCX*toCX+toCY*toCY)||1;
       const dir0X=toCX/toCLen, dir0Y=toCY/toCLen; // dir0Y는 항상 양수(위쪽) — 음수(아래) 방출 없음
       const initSpd=(0.08+Math.random()*0.04)*PETAL_CONFIG.INITIAL_SPAWN_SPEED;
@@ -426,6 +432,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         mesh, mat,
         vx: dir0X*initSpd,
         vy: dir0Y*initSpd,
+        dirX: dir0X, dirY: dir0Y,
         vz:(Math.random()-.5)*0.006,
         pitchVel:0,
         yawVel:0,
@@ -457,6 +464,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       noiseOff:THREE.Vector3;
       age:number; maxAge:number;
       phase:number; scale:number;
+      dirX:number; dirY:number;
     }
     const goldSparks:GoldSpark[]=[];
 
@@ -464,7 +472,8 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
     function spawnGoldSpark(
       ox:number, oy:number, oz:number,
       pvx:number, pvy:number,
-      tint:THREE.Color
+      tint:THREE.Color,
+      dirX:number, dirY:number
     ){
       if(goldSparks.length>=PETAL_CONFIG.PARTICLE_MAX_COUNT) return;
       const mat=new THREE.MeshBasicMaterial({
@@ -508,6 +517,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         noiseOff:new THREE.Vector3(Math.random()*2,Math.random()*2,Math.random()*2),
         age:0, maxAge:50,
         phase:Math.random()*Math.PI*2, scale:s,
+        dirX, dirY,
       });
     }
 
@@ -645,7 +655,6 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       // 화면 경계 (월드 좌표)
       const halfH_s=Math.tan((camera.fov*Math.PI/180)/2)*camera.position.z;
       const halfW_s=halfH_s*(container.clientWidth/container.clientHeight);
-      const corner=getTargetCorner(); // ★ 최종 목적지: 화면 우측 상단 꼭지점
 
       for(let i=flyPetals.length-1;i>=0;i--){
         const p=flyPetals[i];
@@ -676,11 +685,9 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         // 노이즈 비중 높이고 직선 바람 줄임
         const noiseAmp=p.windStr*(1.0+vol*0.7)*windT;
 
-        // ── 4. 주 바람: 우측 상단 꼭지점(corner) 방향으로 고정, MAX_WIND_FORCE 적용 ──
+        // ── 4. 주 바람: 꽃잎 개별 목적지(p.dirX,p.dirY) 방향으로 고정 — 한 점 압착 방지
         // ★ 소용돌이 완전 제거 — 12시로 솟구쳤다가 꺾이는 잔상의 원인이었음
-        const toCornerX=corner.x-fp.x, toCornerY=corner.y-fp.y;
-        const toCornerLen=Math.sqrt(toCornerX*toCornerX+toCornerY*toCornerY)||1;
-        const STREAM_X=toCornerX/toCornerLen, STREAM_Y=toCornerY/toCornerLen;
+        const STREAM_X=p.dirX, STREAM_Y=p.dirY;
         const windScale=PETAL_CONFIG.MAX_WIND_FORCE*(0.25+vol*0.75)*p.windStr;
         // 난류(노이즈) 영향력을 RANDOM_DRIFT_FORCE로 최소화 — 흩어짐 억제
         p.vx+=(STREAM_X*windScale + flow.x*noiseAmp*PETAL_CONFIG.RANDOM_DRIFT_FORCE)*dt;
@@ -755,7 +762,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
 
         // ── 13. 꽃잎 궤적에서 황금 파티클 방출 ─────────────────────────────
         if(windT>0.15 && Math.random()<0.20+vol*0.20)
-          spawnGoldSpark(px,py,pz,p.vx,p.vy,liveColor);
+          spawnGoldSpark(px,py,pz,p.vx,p.vy,liveColor,p.dirX,p.dirY);
       }
 
       // ─── 황금 빛 파티클 업데이트 (꽃잎과 동일한 물리) ─────────────────
@@ -785,10 +792,8 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         const sFlow=curlNoise(snx,sny,snz,time);
         const sNoiseAmp=s.windStr*(0.20+vol*0.20)*sWindT;  // ★ 1/5 수준으로 감소
 
-        // 4. 주 바람 — 우측 상단 꼭지점 방향 (꽃→꼭지점 직선과 동일)
-        const sToCornerX=corner.x-fp.x, sToCornerY=corner.y-fp.y;
-        const sToCornerLen=Math.sqrt(sToCornerX*sToCornerX+sToCornerY*sToCornerY)||1;
-        const sSX=sToCornerX/sToCornerLen, sSY=sToCornerY/sToCornerLen;
+        // 4. 주 바람 — 부모 꽃잎으로부터 물려받은 개별 목적지 방향
+        const sSX=s.dirX, sSY=s.dirY;
         const sWindScale=PETAL_CONFIG.MAX_WIND_FORCE*(0.25+vol*0.75)*s.windStr;
         s.vx+=(sSX*sWindScale+sFlow.x*sNoiseAmp*0.7)*dt;
         s.vy+=(sSY*sWindScale+sFlow.y*sNoiseAmp*0.5)*dt;
