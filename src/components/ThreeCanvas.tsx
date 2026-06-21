@@ -689,8 +689,8 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         const perpDist=relX*PERP_X+relY*PERP_Y;
         if(windT>0.1){
           // 연속 인력: 중심선에서 먼 만큼 비례하여 끌어당겨 하나의 띠로 정돈
-          p.vx-=perpDist*PERP_X*PETAL_CONFIG.CENTER_PULL_FORCE;
-          p.vy-=perpDist*PERP_Y*PETAL_CONFIG.CENTER_PULL_FORCE;
+          p.vx-=perpDist*PERP_X*PETAL_CONFIG.CENTER_PULL_FORCE*60*dt;
+          p.vy-=perpDist*PERP_Y*PETAL_CONFIG.CENTER_PULL_FORCE*60*dt;
         }
         // 하드 채널: STREAM_WIDTH를 넘어서면 추가로 강하게 복원 (안전장치)
         if(Math.abs(perpDist)>PETAL_CONFIG.STREAM_WIDTH && windT>0.1){
@@ -705,8 +705,15 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
           if(p.vy<0.35*p.windStr-0.7) p.vy*=0.86;
         }
 
-        // ── 8.4. 제자리 정체 방지 — 최소 전진 속도 보장 ────────────────────
-        if(windT>0.4) p.vx=Math.max(p.vx,0.06*p.windStr);
+        // ── 8.4. 제자리 정체 방지 — 생성 즉시 최소 전진 속도 보장 ──────────
+        p.vx=Math.max(p.vx,STREAM_X*0.45);
+        p.vy=Math.max(p.vy,STREAM_Y*0.25);
+
+        // ── 8.6. 0.3초 이상 정체 완전 차단 — 우측 상단(TARGET_ANGLE) 강제 진행
+        if(p.age>0.3){
+          p.vx=Math.max(p.vx,STREAM_X*0.6);
+          p.vy=Math.max(p.vy,STREAM_Y*0.35);
+        }
 
         // ── 8.5. 왼쪽 1/3 구역에서 위쪽 속도 억제 (12시 방향 차단)
         if(px < -halfW_s/3 && p.vy > 0) p.vy *= 0.75;
