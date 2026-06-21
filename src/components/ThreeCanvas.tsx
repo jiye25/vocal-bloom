@@ -24,7 +24,7 @@ const PETAL_CONFIG = {
   BASE_SIZE:          1.7,   // 꽃잎 기본 크기 (Three.js 월드 단위)
   SIZE_VARIATION:     0.03,  // 크기 랜덤 오차 ±3%
 
-  BASE_ANGLE:        -25,    // 생성 시 기본 Z 회전 각도 (도)
+  BASE_ANGLE:        -30,    // 생성 시 기본 Z 회전 각도 (도)
 
   // ── 동선 제어: 우측 상단 "영역"으로 풍성하게 퍼지는 흐름을 위한 변수 ──────
   TARGET_X:            0.95,  // 최종 목적지 X (화면 절반 너비 비율, 1.0=정확히 우측 끝)
@@ -36,9 +36,9 @@ const PETAL_CONFIG = {
   MIN_X_VELOCITY:      1.6,   // 중간에 멈추는 현상을 막는 최소 오른쪽 전진 속도
   FORCE_DAMPING:       1.0,   // 관성을 더 부드럽게 — 직선이 아닌 곡선 흐름 강화
 
-  X_ROTATION_SPEED:   0.2,   // X축 앞뒤 까딱임 강도 (Pitch)
-  Y_ROTATION_SPEED:   0.45,  // Y축 좌우 돌림 강도 (Yaw)
-  Z_ROTATION_SPEED:   0.7,   // Z축 시계추 흔들림 강도 (Roll)
+  X_ROTATION_SPEED:   0.3,   // X축 앞뒤 까딱임 강도 (Pitch)
+  Y_ROTATION_SPEED:   0.5,   // Y축 좌우 돌림 강도 (Yaw)
+  Z_ROTATION_SPEED:   0.8,   // Z축 시계추 흔들림 강도 (Roll)
 
   SPAWN_RADIUS_MIN:   0.80,  // 수술 중심 제외 최소 반지름
   SPAWN_RADIUS_MAX:   2.2,   // 스폰 최대 반지름
