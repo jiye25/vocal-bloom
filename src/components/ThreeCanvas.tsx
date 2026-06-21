@@ -21,8 +21,8 @@ const FLOWER_UV_Y = 0.92;
 const PETAL_CONFIG = {
   START_COUNT:        10,    // 최초 트리거 시 기본 스폰 개수
 
-  BASE_SIZE:          1.7,   // 꽃잎 기본 크기 (Three.js 월드 단위)
-  SIZE_VARIATION:     0.03,  // 크기 랜덤 오차 ±3%
+  BASE_SIZE:          1.82,  // 꽃잎 기본 크기 (Three.js 월드 단위)
+  SIZE_VARIATION:     0.05,  // 크기 랜덤 오차 ±5%
 
   BASE_ANGLE:        -30,    // 생성 시 기본 Z 회전 각도 (도)
 
