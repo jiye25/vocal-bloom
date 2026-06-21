@@ -29,12 +29,12 @@ const PETAL_CONFIG = {
   // ── 동선 제어: 우측 상단 "영역"으로 풍성하게 퍼지는 흐름을 위한 변수 ──────
   TARGET_X:            0.95,  // 최종 목적지 X (화면 절반 너비 비율, 1.0=정확히 우측 끝)
   TARGET_Y:            0.85,  // 목적지 영역의 위쪽 기준선 (화면 절반 높이 비율)
-  TARGET_Y_RANGE:      0.35,  // 꽃잎마다 목적지를 이 범위 안에서 랜덤 분산 (압착 방지)
-  STREAM_WIDTH:        1.5,   // 개별 궤도 직선 기준 허용 상하 두께 (Three.js 월드 단위)
+  TARGET_Y_RANGE:      0.55,  // 꽃잎마다 목적지를 이 범위 안에서 랜덤 분산 (압착 방지)
+  STREAM_WIDTH:        2.4,   // 개별 궤도 직선 기준 허용 상하 두께 (Three.js 월드 단위)
   RANDOM_DRIFT_FORCE:  0.05,  // 사방으로 흩어지게 만드는 난류(노이즈)의 최대 세기 (최소화)
-  CENTER_PULL_FORCE:   0.012, // 인력을 대폭 줄여 깔때기(블랙홀) 현상 방지
-  MIN_X_VELOCITY:      0.95,  // 중간에 멈추는 현상을 막는 최소 오른쪽 전진 속도
-  FORCE_DAMPING:       0.98,  // 관성을 더 부드럽게 — 직선이 아닌 곡선 흐름 강화
+  CENTER_PULL_FORCE:   0.006, // 인력을 대폭 줄여 깔때기(블랙홀) 현상 방지
+  MIN_X_VELOCITY:      1.6,   // 중간에 멈추는 현상을 막는 최소 오른쪽 전진 속도
+  FORCE_DAMPING:       1.0,   // 관성을 더 부드럽게 — 직선이 아닌 곡선 흐름 강화
 
   X_ROTATION_SPEED:   0.2,   // X축 앞뒤 까딱임 강도 (Pitch)
   Y_ROTATION_SPEED:   0.45,  // Y축 좌우 돌림 강도 (Yaw)
@@ -44,7 +44,7 @@ const PETAL_CONFIG = {
   SPAWN_RADIUS_MAX:   2.2,   // 스폰 최대 반지름
 
   AUDIO_THRESHOLD:    0.12,  // 꽃잎 생성 시작 최소 볼륨 (0~1) — 소음 차단
-  MAX_WIND_FORCE:     1.3,   // 최대 볼륨 시 바람 세기 승수
+  MAX_WIND_FORCE:     1.8,   // 최대 볼륨 시 바람 세기 승수
   MAX_PETAL_COUNT:    28,    // 화면 내 최대 꽃잎 수
 
   // ★ 꽃잎 초기 방출 방향 (3시 방향 = 0°, 12시 = 90°)
