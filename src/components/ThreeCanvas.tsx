@@ -26,15 +26,23 @@ const PETAL_CONFIG = {
 
   BASE_ANGLE:        -25,    // 생성 시 기본 Z 회전 각도 (도)
 
-  // ── 동선 제어: 우측 상단 "영역"으로 풍성하게 퍼지는 흐름을 위한 변수 ──────
+  // ── 동선 제어: "황금 비율" 고정 — 느려짐과 뭉침을 동시에 잡는 핵심 변수 ──
   TARGET_X:            0.95,  // 최종 목적지 X (화면 절반 너비 비율, 1.0=정확히 우측 끝)
   TARGET_Y:            0.85,  // 목적지 영역의 위쪽 기준선 (화면 절반 높이 비율)
   TARGET_Y_RANGE:      0.55,  // 꽃잎마다 목적지를 이 범위 안에서 랜덤 분산 (압착 방지)
   STREAM_WIDTH:        2.4,   // 개별 궤도 직선 기준 허용 상하 두께 (Three.js 월드 단위)
   RANDOM_DRIFT_FORCE:  0.05,  // 사방으로 흩어지게 만드는 난류(노이즈)의 최대 세기 (최소화)
-  CENTER_PULL_FORCE:   0.0018, // 인력을 기존의 30% 수준까지 대폭 축소 (대형 압착 방지)
-  MIN_X_VELOCITY:      1.6,   // 중간에 멈추는 현상을 막는 최소 오른쪽 전진 속도
-  FORCE_DAMPING:       1.0,   // 관성을 더 부드럽게 — 직선이 아닌 곡선 흐름 강화
+  CENTER_PULL_FORCE:   0.01,  // 목적지로 당기는 힘은 아주 미미하게 (압착 방지)
+  WIND_NOISE_SCALE:    0.005, // 목적지 출렁임의 흐르는 속도 (펄린 노이즈풍 사인파)
+  TARGET_WOBBLE_AMP:   0.7,   // 목적지 Y가 출렁이는 폭 (Three.js 월드 단위) — 깔때기 압착 방지
+  SEPARATION_DIST:      0.9,  // 이 거리보다 가까운 꽃잎끼리 서로 밀어냄
+  SEPARATION_FORCE:     0.5,  // 척력 세기
+  INITIAL_VX_MIN:      1.8,   // 태어날 때의 시원한 오른쪽 최소 속도
+  INITIAL_VY_MIN:      1.0,   // 태어날 때의 우상향 최소 상승 속도
+  MIN_X_VELOCITY:      1.6,   // 중간에 멈추는 현상을 막는 최소 오른쪽 전진 속도(가속도 계산 후 강제)
+  MIN_Y_VELOCITY:      0.6,   // 우상향 대각선 유지를 위한 최소 상승 속도
+  MAX_Y_VELOCITY:      1.6,   // 너무 수직으로 솟지 않도록 막는 상한선
+  FORCE_DAMPING:       0.98,  // 부드러운 관성 유지
 
   X_ROTATION_SPEED:   0.2,   // X축 앞뒤 까딱임 강도 (Pitch)
   Y_ROTATION_SPEED:   0.45,  // Y축 좌우 돌림 강도 (Yaw)
@@ -382,7 +390,8 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       noiseOff:THREE.Vector3;               // 개별 노이즈 오프셋
       age:number; maxAge:number;
       scale:number; phase:number;
-      dirX:number; dirY:number;             // 개별 목적지로 향하는 고정 방향 (압착 방지)
+      dirX:number; dirY:number;             // 개별 목적지로 향하는 방향 (매 프레임 갱신)
+      baseTargetX:number; baseTargetY:number; // 출렁이기 전의 기준 목적지
     }
     const flyPetals:FlyPetal[]=[];
     const MAX_FLY=PETAL_CONFIG.MAX_PETAL_COUNT;
@@ -439,15 +448,15 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       const toCX=myTargetX-mesh.position.x, toCY=myTargetY-mesh.position.y;
       const toCLen=Math.sqrt(toCX*toCX+toCY*toCY)||1;
       const dir0X=toCX/toCLen, dir0Y=toCY/toCLen; // dir0Y는 항상 양수(위쪽) — 음수(아래) 방출 없음
-      // ★ 초기 발사 속도는 목적지 방향과 분리해 개별적으로 크게 무작위화
-      // (방향은 dirX/dirY로 서서히 수렴, 출발 속도는 꽃잎마다 확실히 다르게)
-      const launchVx=(0.45+Math.random()*0.85)*PETAL_CONFIG.INITIAL_SPAWN_SPEED*0.4;
-      const launchVy=(0.20+Math.random()*0.55)*PETAL_CONFIG.INITIAL_SPAWN_SPEED*0.4;
+      // ★ 초기 발사 속도: 시원한 최소 속도 보장 + 개별 무작위 가산 (압착과 무관하게 분산)
+      const launchVx=PETAL_CONFIG.INITIAL_VX_MIN*(0.9+Math.random()*0.5);
+      const launchVy=PETAL_CONFIG.INITIAL_VY_MIN*(0.8+Math.random()*0.5);
       flyPetals.push({
         mesh, mat,
         vx: launchVx,
         vy: launchVy,
         dirX: dir0X, dirY: dir0Y,
+        baseTargetX: myTargetX, baseTargetY: myTargetY,
         vz:(Math.random()-.5)*0.006,
         pitchVel:0,
         yawVel:0,
@@ -715,53 +724,56 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         // 노이즈 비중 높이고 직선 바람 줄임
         const noiseAmp=p.windStr*(1.0+vol*0.7)*windT;
 
-        // ── 4. 주 바람: 꽃잎 개별 목적지(p.dirX,p.dirY) 방향으로 고정 — 한 점 압착 방지
+        // ── 4. 목적지 출렁이기 — 펄린(사인파) 노이즈로 타겟 Y를 계속 흔들어서
+        // 한 점으로 절대 압착되지 않게 함 (개별 phase로 서로 다른 타이밍)
+        const dynamicTargetY=p.baseTargetY
+          + Math.sin(time*1.0+p.phase)*PETAL_CONFIG.TARGET_WOBBLE_AMP;
+        const dTX=p.baseTargetX-px, dTY=dynamicTargetY-py;
+        const dTLen=Math.sqrt(dTX*dTX+dTY*dTY)||1;
+        p.dirX=dTX/dTLen; p.dirY=dTY/dTLen;
+
+        // ── 5. 주 바람: 꽃잎 개별(출렁이는) 목적지 방향으로 — 한 점 압착 방지
         // ★ 소용돌이 완전 제거 — 12시로 솟구쳤다가 꺾이는 잔상의 원인이었음
         const STREAM_X=p.dirX, STREAM_Y=p.dirY;
         const windScale=PETAL_CONFIG.MAX_WIND_FORCE*(0.25+vol*0.75)*p.windStr;
         // 난류(노이즈) 영향력을 RANDOM_DRIFT_FORCE로 최소화 — 흩어짐 억제
-        p.vx+=(STREAM_X*windScale + flow.x*noiseAmp*PETAL_CONFIG.RANDOM_DRIFT_FORCE)*dt;
-        p.vy+=(STREAM_Y*windScale   + flow.y*noiseAmp*PETAL_CONFIG.RANDOM_DRIFT_FORCE)*dt;
+        const driftMix=PETAL_CONFIG.RANDOM_DRIFT_FORCE+PETAL_CONFIG.WIND_NOISE_SCALE;
+        p.vx+=(STREAM_X*windScale + flow.x*noiseAmp*driftMix)*dt;
+        p.vy+=(STREAM_Y*windScale   + flow.y*noiseAmp*driftMix)*dt;
         p.vz=0; // ★ z축 고정 — vz 누적으로 원근 축소되는 현상 방지
 
         // ── 6. 공기 저항 — FORCE_DAMPING 적용 ───────────────────────────────
         const drag=Math.pow(PETAL_CONFIG.FORCE_DAMPING, dt*60);
         p.vx*=drag; p.vy*=drag; p.vz*=drag;
 
-        // ── 7. 메인 궤도 흡입력 — 꽃→꼭지점 직선 중심에서 멀어질수록 끌어당김 ──
+        // ── 7. 목적지 흡입력 — 아주 미미하게 (CENTER_PULL_FORCE=0.01) ──────
         const PERP_X=-STREAM_Y, PERP_Y=STREAM_X;
-        const relX=px-fp.x, relY=py-fp.y;
-        const perpDist=relX*PERP_X+relY*PERP_Y;
         if(windT>0.1){
-          // 연속 인력: 중심선에서 먼 만큼 비례하여 끌어당겨 하나의 띠로 정돈
-          p.vx-=perpDist*PERP_X*PETAL_CONFIG.CENTER_PULL_FORCE*60*dt;
-          p.vy-=perpDist*PERP_Y*PETAL_CONFIG.CENTER_PULL_FORCE*60*dt;
-        }
-        // ★ 개별 위상(phase) 기반 미세 흔들림 — 대형이 한 줄로 굳지 않도록 흐트러뜨림
-        const wobble=Math.sin(p.age*0.9+p.phase)*0.18*windT;
-        p.vx+=wobble*PERP_X*dt*4.0;
-        p.vy+=wobble*PERP_Y*dt*4.0;
-        // 하드 채널: STREAM_WIDTH를 넘어서면 추가로 강하게 복원 (안전장치)
-        if(Math.abs(perpDist)>PETAL_CONFIG.STREAM_WIDTH && windT>0.1){
-          const excess=perpDist-Math.sign(perpDist)*PETAL_CONFIG.STREAM_WIDTH;
-          p.vx-=excess*PERP_X*4.0*dt;
-          p.vy-=excess*PERP_Y*4.0*dt;
+          p.vx+=dTX/dTLen*PETAL_CONFIG.CENTER_PULL_FORCE*60*dt;
+          p.vy+=dTY/dTLen*PETAL_CONFIG.CENTER_PULL_FORCE*60*dt;
         }
 
         // ── 8. 역방향 댐핑 ───────────────────────────────────────────────────
         if(windT>0.3){
           if(p.vx<-0.04) p.vx*=0.82;
-          if(p.vy<0.35*p.windStr-0.7) p.vy*=0.86;
         }
 
-        // ── 8.4. 제자리 정체 방지 — MIN_X_VELOCITY로 최소 전진 속도 보장 ──
-        p.vx=Math.max(p.vx,PETAL_CONFIG.MIN_X_VELOCITY*0.7);
-        p.vy=Math.max(p.vy,STREAM_Y*PETAL_CONFIG.MIN_X_VELOCITY*0.55);
+        // ── 8.4. 황금 비율 속도 하한선 — 가속도 계산 직후 칼같이 고정 ───────
+        // (FORCE_DAMPING으로 인해 절대 느려지지 않도록 강제)
+        if(p.vx<PETAL_CONFIG.MIN_X_VELOCITY) p.vx=PETAL_CONFIG.MIN_X_VELOCITY;
+        if(p.vy<PETAL_CONFIG.MIN_Y_VELOCITY) p.vy=PETAL_CONFIG.MIN_Y_VELOCITY;
+        if(p.vy>PETAL_CONFIG.MAX_Y_VELOCITY) p.vy=PETAL_CONFIG.MAX_Y_VELOCITY;
 
-        // ── 8.6. 0.3초 이상 정체 완전 차단 — 꼭지점 방향 강제 진행
-        if(p.age>0.3){
-          p.vx=Math.max(p.vx,PETAL_CONFIG.MIN_X_VELOCITY);
-          p.vy=Math.max(p.vy,STREAM_Y*PETAL_CONFIG.MIN_X_VELOCITY*0.8);
+        // ── 8.8. 미세 척력(Separation) — 가까운 꽃잎끼리 Y축으로 살짝 밀어냄 ─
+        for(let j=flyPetals.length-1;j>=0;j--){
+          if(j===i) continue;
+          const op=flyPetals[j];
+          const ddx=px-op.mesh.position.x, ddy=py-op.mesh.position.y;
+          const dd=Math.sqrt(ddx*ddx+ddy*ddy);
+          if(dd>0 && dd<PETAL_CONFIG.SEPARATION_DIST){
+            const push=(1-dd/PETAL_CONFIG.SEPARATION_DIST)*PETAL_CONFIG.SEPARATION_FORCE;
+            p.vy+=Math.sign(ddy||1)*push*dt*60;
+          }
         }
 
         // ── 9. 위치 이동 ──────────────────────────────────────────────────────
