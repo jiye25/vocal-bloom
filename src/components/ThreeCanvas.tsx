@@ -41,7 +41,7 @@ const PETAL_CONFIG = {
   SPAWN_RADIUS_MAX:   1.80,  // 스폰 최대 반지름
 
   AUDIO_THRESHOLD:    0.12,  // 꽃잎 생성 시작 최소 볼륨 (0~1) — 소음 차단
-  MAX_WIND_FORCE:     1.0,   // 최대 볼륨 시 바람 세기 승수
+  MAX_WIND_FORCE:     1.6,   // 최대 볼륨 시 바람 세기 승수
   MAX_PETAL_COUNT:    28,    // 화면 내 최대 꽃잎 수
 
   // ★ 꽃잎 초기 방출 방향 (3시 방향 = 0°, 12시 = 90°)
@@ -706,13 +706,13 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         }
 
         // ── 8.4. 제자리 정체 방지 — 생성 즉시 최소 전진 속도 보장 ──────────
-        p.vx=Math.max(p.vx,STREAM_X*0.45);
-        p.vy=Math.max(p.vy,STREAM_Y*0.25);
+        p.vx=Math.max(p.vx,STREAM_X*0.7);
+        p.vy=Math.max(p.vy,STREAM_Y*0.4);
 
         // ── 8.6. 0.3초 이상 정체 완전 차단 — 우측 상단(TARGET_ANGLE) 강제 진행
         if(p.age>0.3){
-          p.vx=Math.max(p.vx,STREAM_X*0.6);
-          p.vy=Math.max(p.vy,STREAM_Y*0.35);
+          p.vx=Math.max(p.vx,STREAM_X*0.95);
+          p.vy=Math.max(p.vy,STREAM_Y*0.55);
         }
 
         // ── 8.5. 왼쪽 1/3 구역에서 위쪽 속도 억제 (12시 방향 차단)
