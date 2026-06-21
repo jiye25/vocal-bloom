@@ -32,7 +32,7 @@ const PETAL_CONFIG = {
   TARGET_Y_RANGE:      0.55,  // 꽃잎마다 목적지를 이 범위 안에서 랜덤 분산 (압착 방지)
   STREAM_WIDTH:        2.4,   // 개별 궤도 직선 기준 허용 상하 두께 (Three.js 월드 단위)
   RANDOM_DRIFT_FORCE:  0.05,  // 사방으로 흩어지게 만드는 난류(노이즈)의 최대 세기 (최소화)
-  CENTER_PULL_FORCE:   0.006, // 인력을 대폭 줄여 깔때기(블랙홀) 현상 방지
+  CENTER_PULL_FORCE:   0.0018, // 인력을 기존의 30% 수준까지 대폭 축소 (대형 압착 방지)
   MIN_X_VELOCITY:      1.6,   // 중간에 멈추는 현상을 막는 최소 오른쪽 전진 속도
   FORCE_DAMPING:       1.0,   // 관성을 더 부드럽게 — 직선이 아닌 곡선 흐름 강화
 
@@ -54,8 +54,8 @@ const PETAL_CONFIG = {
   // ★ 꽃잎 생성 양/빈도 제어
   SPAWN_INTERVAL_FRAMES:    4,     // N프레임마다 스폰 체크 (낮을수록 더 자주)
   BASE_SPAWN_CHANCE:        0.14,  // 볼륨 최저(임계값)일 때 생성 확률 → 몇 초에 한 장
-  MAX_SPAWN_CHANCE:         0.95,  // 볼륨 최대(1.0)일 때 생성 확률 → 화르륵 무더기
-  BURST_SPAWN_COUNT:        2.5,   // 조건 충족 시 한 번에 생성할 꽃잎 수
+  MAX_SPAWN_CHANCE:         0.80,  // 볼륨 최대(1.0)일 때 생성 확률 → 무더기로 한꺼번에 쏟아지지 않게 캡
+  BURST_SPAWN_COUNT:        2.0,   // 조건 충족 시 한 번에 생성할 꽃잎 수
 
   IDLE_SPAWN_INTERVAL:      3.5,   // 무음 시 꽃잎 자동 생성 간격 (초)
 
@@ -439,11 +439,14 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       const toCX=myTargetX-mesh.position.x, toCY=myTargetY-mesh.position.y;
       const toCLen=Math.sqrt(toCX*toCX+toCY*toCY)||1;
       const dir0X=toCX/toCLen, dir0Y=toCY/toCLen; // dir0Y는 항상 양수(위쪽) — 음수(아래) 방출 없음
-      const initSpd=(0.08+Math.random()*0.04)*PETAL_CONFIG.INITIAL_SPAWN_SPEED;
+      // ★ 초기 발사 속도는 목적지 방향과 분리해 개별적으로 크게 무작위화
+      // (방향은 dirX/dirY로 서서히 수렴, 출발 속도는 꽃잎마다 확실히 다르게)
+      const launchVx=(0.45+Math.random()*0.85)*PETAL_CONFIG.INITIAL_SPAWN_SPEED*0.4;
+      const launchVy=(0.20+Math.random()*0.55)*PETAL_CONFIG.INITIAL_SPAWN_SPEED*0.4;
       flyPetals.push({
         mesh, mat,
-        vx: dir0X*initSpd,
-        vy: dir0Y*initSpd,
+        vx: launchVx,
+        vy: launchVy,
         dirX: dir0X, dirY: dir0Y,
         vz:(Math.random()-.5)*0.006,
         pitchVel:0,
@@ -719,6 +722,10 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
           p.vx-=perpDist*PERP_X*PETAL_CONFIG.CENTER_PULL_FORCE*60*dt;
           p.vy-=perpDist*PERP_Y*PETAL_CONFIG.CENTER_PULL_FORCE*60*dt;
         }
+        // ★ 개별 위상(phase) 기반 미세 흔들림 — 대형이 한 줄로 굳지 않도록 흐트러뜨림
+        const wobble=Math.sin(p.age*0.9+p.phase)*0.18*windT;
+        p.vx+=wobble*PERP_X*dt*4.0;
+        p.vy+=wobble*PERP_Y*dt*4.0;
         // 하드 채널: STREAM_WIDTH를 넘어서면 추가로 강하게 복원 (안전장치)
         if(Math.abs(perpDist)>PETAL_CONFIG.STREAM_WIDTH && windT>0.1){
           const excess=perpDist-Math.sign(perpDist)*PETAL_CONFIG.STREAM_WIDTH;
