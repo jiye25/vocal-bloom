@@ -26,10 +26,12 @@ const PETAL_CONFIG = {
 
   BASE_ANGLE:        -25,    // 생성 시 기본 Z 회전 각도 (도)
 
-  // ── 동선 제어 ──────────────────────────────────────────────────────────
-  TARGET_ANGLE:      -20,    // 꽃잎 진행 방향 각도 (도, 0°=수평 우측, 클수록 위로)
-  STREAM_WIDTH:       1.6,   // 바람 길 반폭 (Three.js 월드 단위, 클수록 퍼짐)
-  FORCE_DAMPING:      1.0,   // 속도 감쇠율 (낮을수록 빨리 느려짐)
+  // ── 동선 제어: 우아한 한 줄기 흐름(은하수 스트림)을 위한 핵심 변수 ──────
+  TARGET_ANGLE:        -15,   // 최종 목적지 각도 (도, 완만한 우상향 대각선)
+  STREAM_WIDTH:        0.9,   // 바람 길의 최대 상하 허용 두께 (Three.js 월드 단위)
+  RANDOM_DRIFT_FORCE:  0.05,  // 사방으로 흩어지게 만드는 난류(노이즈)의 최대 세기 (최소화)
+  CENTER_PULL_FORCE:   0.02,  // 중심 궤도로 꽃잎을 모아주는 인력의 세기
+  FORCE_DAMPING:       0.97,  // 관성을 부드럽게 만드는 감쇠율 (낮을수록 끈끈한 유체감)
 
   X_ROTATION_SPEED:   0.2,   // X축 앞뒤 까딱임 강도 (Pitch)
   Y_ROTATION_SPEED:   0.45,  // Y축 좌우 돌림 강도 (Yaw)
@@ -664,8 +666,9 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         const tRad=Math.abs(PETAL_CONFIG.TARGET_ANGLE)*Math.PI/180;
         const STREAM_X=Math.cos(tRad), STREAM_Y=Math.sin(tRad);
         const windScale=PETAL_CONFIG.MAX_WIND_FORCE*(0.25+vol*0.75)*p.windStr;
-        p.vx+=(STREAM_X*windScale + flow.x*noiseAmp*2.2)*dt;
-        p.vy+=(STREAM_Y*windScale   + flow.y*noiseAmp*1.6)*dt;
+        // 난류(노이즈) 영향력을 RANDOM_DRIFT_FORCE로 최소화 — 흩어짐 억제
+        p.vx+=(STREAM_X*windScale + flow.x*noiseAmp*PETAL_CONFIG.RANDOM_DRIFT_FORCE)*dt;
+        p.vy+=(STREAM_Y*windScale   + flow.y*noiseAmp*PETAL_CONFIG.RANDOM_DRIFT_FORCE)*dt;
         p.vz=0; // ★ z축 고정 — vz 누적으로 원근 축소되는 현상 방지
 
         // ── 5. 소용돌이 ──────────────────────────────────────────────────────
@@ -680,10 +683,16 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         const drag=Math.pow(PETAL_CONFIG.FORCE_DAMPING, dt*60);
         p.vx*=drag; p.vy*=drag; p.vz*=drag;
 
-        // ── 7. 스트림 채널 — STREAM_WIDTH로 폭 제한, 이탈 시 복원력 ─────────
+        // ── 7. 메인 궤도 흡입력 — 중심선에서 멀어질수록 부드럽게 끌어당김 ──
         const PERP_X=-STREAM_Y, PERP_Y=STREAM_X;
         const relX=px-fp.x, relY=py-fp.y;
         const perpDist=relX*PERP_X+relY*PERP_Y;
+        if(windT>0.1){
+          // 연속 인력: 중심선에서 먼 만큼 비례하여 끌어당겨 하나의 띠로 정돈
+          p.vx-=perpDist*PERP_X*PETAL_CONFIG.CENTER_PULL_FORCE;
+          p.vy-=perpDist*PERP_Y*PETAL_CONFIG.CENTER_PULL_FORCE;
+        }
+        // 하드 채널: STREAM_WIDTH를 넘어서면 추가로 강하게 복원 (안전장치)
         if(Math.abs(perpDist)>PETAL_CONFIG.STREAM_WIDTH && windT>0.1){
           const excess=perpDist-Math.sign(perpDist)*PETAL_CONFIG.STREAM_WIDTH;
           p.vx-=excess*PERP_X*4.0*dt;
