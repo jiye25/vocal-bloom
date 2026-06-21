@@ -45,7 +45,7 @@ const PETAL_CONFIG = {
 
   AUDIO_THRESHOLD:    0.12,  // 꽃잎 생성 시작 최소 볼륨 (0~1) — 소음 차단
   MAX_WIND_FORCE:     1.8,   // 최대 볼륨 시 바람 세기 승수
-  MAX_PETAL_COUNT:    28,    // 화면 내 최대 꽃잎 수
+  MAX_PETAL_COUNT:    20,    // 화면 내 최대 꽃잎 수
 
   // ★ 꽃잎 초기 방출 방향 (3시 방향 = 0°, 12시 = 90°)
   SPAWN_DIRECTION_ANGLE:    0,     // 생성 첫 프레임 방출 각도 (도)
@@ -569,9 +569,12 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
     let spawnFrameCount=0; // SPAWN_INTERVAL_FRAMES 체크용
     let idleSpawnTimer=0;  // 무음 idle 스폰 타이머
     let prevHasEmo=false;  // 감정 상태 전환 감지용
-    let pendingSpawns=0;       // ★ 한꺼번에 쏟지 않고 대기열에 쌓아 하나씩 꺼내 생성
-    let pendingSpawnTimer=0;   // 대기열에서 다음 1개를 꺼낼 때까지의 타이머
+    let pendingSpawns=0;       // ★ 볼륨 버스트 대기열 — 한꺼번에 쏟지 않고 하나씩 꺼내 생성
+    let pendingSpawnTimer=0;
     const PENDING_SPAWN_INTERVAL=0.12; // 짧은 간격으로 하나씩 균일하게 생성 (초)
+    let pendingEmoSpawns=0;       // ★ 감정 인식 버스트 전용 대기열
+    let pendingEmoSpawnTimer=0;
+    const PENDING_EMO_SPAWN_INTERVAL=0.2; // 감정 인식 시 0.2초 간격으로 순차 생성
 
     // ─── 렌더 루프 ───────────────────────────────────────────────────────────
     function tick(){
@@ -616,13 +619,13 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       flowerMat.uniforms["uTint"].value.copy(liveColor);
       flowerMat.uniforms["uTintAmount"].value=liveTintAmt;
 
-      // ─── 감정 최초 인식 시 최소 꽃잎 개수 — 한꺼번에 대신 대기열에 적립 ──
+      // ─── 감정 최초 인식 시 최소 꽃잎 개수 — 전용 대기열(0.2초 간격)에 적립 ──
       if(hasEmo && !prevHasEmo && activeRef.current){
         const burstCount=Math.min(
           PETAL_CONFIG.MIN_EMOTION_SPAWN_COUNT,
-          PETAL_CONFIG.MAX_PETAL_COUNT - flyPetals.length - pendingSpawns
+          PETAL_CONFIG.MAX_PETAL_COUNT - flyPetals.length - pendingSpawns - pendingEmoSpawns
         );
-        pendingSpawns+=Math.max(0,burstCount);
+        pendingEmoSpawns+=Math.max(0,burstCount);
       }
       prevHasEmo=hasEmo;
 
@@ -677,6 +680,18 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         }
       } else {
         pendingSpawnTimer=0;
+      }
+
+      // ─── 감정 인식 전용 대기열: 0.2초 간격으로 순차 생성 ────────────────
+      if(pendingEmoSpawns>0){
+        pendingEmoSpawnTimer+=dt;
+        if(pendingEmoSpawnTimer>=PENDING_EMO_SPAWN_INTERVAL){
+          pendingEmoSpawnTimer=0;
+          pendingEmoSpawns--;
+          spawnPetal(Math.max(vol,0.3), liveColor, liveTintAmt);
+        }
+      } else {
+        pendingEmoSpawnTimer=0;
       }
 
       // ═══════════════════════════════════════════════════════════════════════
