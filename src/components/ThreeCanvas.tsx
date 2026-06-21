@@ -56,6 +56,7 @@ const PETAL_CONFIG = {
   BASE_SPAWN_CHANCE:        0.14,  // 볼륨 최저(임계값)일 때 생성 확률 → 몇 초에 한 장
   MAX_SPAWN_CHANCE:         0.80,  // 볼륨 최대(1.0)일 때 생성 확률 → 무더기로 한꺼번에 쏟아지지 않게 캡
   BURST_SPAWN_COUNT:        2.0,   // 조건 충족 시 한 번에 생성할 꽃잎 수
+  TAIL_FOLLOW_COUNT:        3,     // 묶음 생성 직후 공백 방지용 후속 꽃잎 수
 
   IDLE_SPAWN_INTERVAL:      3.5,   // 무음 시 꽃잎 자동 생성 간격 (초)
 
@@ -659,9 +660,10 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
                           * (t * t);
 
         if(Math.random() < spawnChance) {
-          // BURST_SPAWN_COUNT만큼 — 한 번에 쏟지 않고 대기열에 적립
+          // BURST_SPAWN_COUNT + TAIL_FOLLOW_COUNT만큼 — 한 번에 쏟지 않고 대기열에 적립
+          // (뒤이어 몇 개 더 따라오게 해서 묶음 직후 허전한 공백을 메움)
           const burst = Math.min(
-            PETAL_CONFIG.BURST_SPAWN_COUNT,
+            PETAL_CONFIG.BURST_SPAWN_COUNT+PETAL_CONFIG.TAIL_FOLLOW_COUNT,
             PETAL_CONFIG.MAX_PETAL_COUNT - flyPetals.length - pendingSpawns
           );
           pendingSpawns+=Math.max(0,burst);
