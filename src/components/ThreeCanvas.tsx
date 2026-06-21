@@ -26,12 +26,12 @@ const PETAL_CONFIG = {
 
   BASE_ANGLE:        -25,    // 생성 시 기본 Z 회전 각도 (도)
 
-  // ── 동선 제어 ──────────────────────────────────────────────────────────
-  TARGET_ANGLE:      -20,    // 꽃잎 진행 방향 각도 (도, 0°=수평 우측, 클수록 위로)
-  STREAM_WIDTH:       1.6,   // 바람 길 반폭 (Three.js 월드 단위, 클수록 퍼짐)
-  RANDOM_DRIFT_FORCE:  1.0,  // (미사용 — 호환용)
-  CENTER_PULL_FORCE:   0,    // 중심 궤도 흡입력 비활성화 (이전 동작으로 복원)
-  FORCE_DAMPING:      1.0,   // 속도 감쇠율 (낮을수록 빨리 느려짐)
+  // ── 동선 제어: 우아한 한 줄기 흐름(은하수 스트림)을 위한 핵심 변수 ──────
+  TARGET_ANGLE:        -15,   // 최종 목적지 각도 (도, 완만한 우상향 대각선)
+  STREAM_WIDTH:        0.9,   // 바람 길의 최대 상하 허용 두께 (Three.js 월드 단위)
+  RANDOM_DRIFT_FORCE:  0.05,  // 사방으로 흩어지게 만드는 난류(노이즈)의 최대 세기 (최소화)
+  CENTER_PULL_FORCE:   0.02,  // 중심 궤도로 꽃잎을 모아주는 인력의 세기
+  FORCE_DAMPING:       0.97,  // 관성을 부드럽게 만드는 감쇠율 (낮을수록 끈끈한 유체감)
 
   X_ROTATION_SPEED:   0.2,   // X축 앞뒤 까딱임 강도 (Pitch)
   Y_ROTATION_SPEED:   0.45,  // Y축 좌우 돌림 강도 (Yaw)
@@ -666,8 +666,9 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         const tRad=Math.abs(PETAL_CONFIG.TARGET_ANGLE)*Math.PI/180;
         const STREAM_X=Math.cos(tRad), STREAM_Y=Math.sin(tRad);
         const windScale=PETAL_CONFIG.MAX_WIND_FORCE*(0.25+vol*0.75)*p.windStr;
-        p.vx+=(STREAM_X*windScale + flow.x*noiseAmp*2.2)*dt;
-        p.vy+=(STREAM_Y*windScale   + flow.y*noiseAmp*1.6)*dt;
+        // 난류(노이즈) 영향력을 RANDOM_DRIFT_FORCE로 최소화 — 흩어짐 억제
+        p.vx+=(STREAM_X*windScale + flow.x*noiseAmp*PETAL_CONFIG.RANDOM_DRIFT_FORCE)*dt;
+        p.vy+=(STREAM_Y*windScale   + flow.y*noiseAmp*PETAL_CONFIG.RANDOM_DRIFT_FORCE)*dt;
         p.vz=0; // ★ z축 고정 — vz 누적으로 원근 축소되는 현상 방지
 
         // ── 5. 소용돌이 ──────────────────────────────────────────────────────
@@ -704,8 +705,16 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
           if(p.vy<0.35*p.windStr-0.7) p.vy*=0.86;
         }
 
-        // ── 8.4. 제자리 정체 방지 — 최소 전진 속도 보장 ────────────────────
-        if(windT>0.4) p.vx=Math.max(p.vx,0.06*p.windStr);
+        // ── 8.4. 제자리 정체 방지 — 생성 즉시 최소 전진 속도 보장 ──────────
+        // (FORCE_DAMPING이 실제 감쇠를 적용하므로 바닥 속도를 강화해 정체 방지)
+        p.vx=Math.max(p.vx,STREAM_X*0.55);
+        p.vy=Math.max(p.vy,STREAM_Y*0.3);
+
+        // ── 8.6. 0.3초 이상 정체 완전 차단 — 목적지 방향 강제 진행
+        if(p.age>0.3){
+          p.vx=Math.max(p.vx,STREAM_X*0.8);
+          p.vy=Math.max(p.vy,STREAM_Y*0.45);
+        }
 
         // ── 8.5. 왼쪽 1/3 구역에서 위쪽 속도 억제 (12시 방향 차단)
         if(px < -halfW_s/3 && p.vy > 0) p.vy *= 0.75;
