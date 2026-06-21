@@ -29,26 +29,26 @@ const PETAL_CONFIG = {
   // ── 동선 제어: 우측 상단 꼭지점을 향한 우아한 질주를 위한 핵심 변수 ──────
   TARGET_X:            0.95,  // 최종 목적지 X (화면 절반 너비 비율, 1.0=정확히 우측 끝)
   TARGET_Y:            0.85,  // 최종 목적지 Y (화면 절반 높이 비율, 1.0=정확히 상단 끝)
-  STREAM_WIDTH:        0.9,   // 꽃·꼭지점 직선 기준 허용 상하 두께 (Three.js 월드 단위)
+  STREAM_WIDTH:        1.5,   // 꽃·꼭지점 직선 기준 허용 상하 두께 (Three.js 월드 단위)
   RANDOM_DRIFT_FORCE:  0.05,  // 사방으로 흩어지게 만드는 난류(노이즈)의 최대 세기 (최소화)
-  CENTER_PULL_FORCE:   0.04,  // 우측 상단 꼭지점으로 꽃잎을 모아 끌고 가는 인력 세기
+  CENTER_PULL_FORCE:   0.02,  // 우측 상단 꼭지점으로 꽃잎을 모아 끌고 가는 인력 세기
   MIN_X_VELOCITY:      0.95,  // 중간에 멈추는 현상을 막는 최소 오른쪽 전진 속도
-  FORCE_DAMPING:       0.97,  // 관성을 부드럽게 만드는 감쇠율 (낮을수록 끈끈한 유체감)
+  FORCE_DAMPING:       1,     // 관성을 부드럽게 만드는 감쇠율 (낮을수록 끈끈한 유체감)
 
   X_ROTATION_SPEED:   0.2,   // X축 앞뒤 까딱임 강도 (Pitch)
   Y_ROTATION_SPEED:   0.45,  // Y축 좌우 돌림 강도 (Yaw)
   Z_ROTATION_SPEED:   0.7,   // Z축 시계추 흔들림 강도 (Roll)
 
   SPAWN_RADIUS_MIN:   0.80,  // 수술 중심 제외 최소 반지름
-  SPAWN_RADIUS_MAX:   1.80,  // 스폰 최대 반지름
+  SPAWN_RADIUS_MAX:   2.2,   // 스폰 최대 반지름
 
   AUDIO_THRESHOLD:    0.12,  // 꽃잎 생성 시작 최소 볼륨 (0~1) — 소음 차단
-  MAX_WIND_FORCE:     1.0,   // 최대 볼륨 시 바람 세기 승수
+  MAX_WIND_FORCE:     1.3,   // 최대 볼륨 시 바람 세기 승수
   MAX_PETAL_COUNT:    28,    // 화면 내 최대 꽃잎 수
 
   // ★ 꽃잎 초기 방출 방향 (3시 방향 = 0°, 12시 = 90°)
   SPAWN_DIRECTION_ANGLE:    0,     // 생성 첫 프레임 방출 각도 (도)
-  INITIAL_SPAWN_SPEED:      1.5,   // 초기 속도 세기 배율 (1.0 = 기본)
+  INITIAL_SPAWN_SPEED:      2,     // 초기 속도 세기 배율 (1.0 = 기본)
 
   // ★ 꽃잎 생성 양/빈도 제어
   SPAWN_INTERVAL_FRAMES:    4,     // N프레임마다 스폰 체크 (낮을수록 더 자주)
