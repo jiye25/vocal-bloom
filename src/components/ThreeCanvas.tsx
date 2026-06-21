@@ -569,6 +569,9 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
     let spawnFrameCount=0; // SPAWN_INTERVAL_FRAMES 체크용
     let idleSpawnTimer=0;  // 무음 idle 스폰 타이머
     let prevHasEmo=false;  // 감정 상태 전환 감지용
+    let pendingSpawns=0;       // ★ 한꺼번에 쏟지 않고 대기열에 쌓아 하나씩 꺼내 생성
+    let pendingSpawnTimer=0;   // 대기열에서 다음 1개를 꺼낼 때까지의 타이머
+    const PENDING_SPAWN_INTERVAL=0.12; // 짧은 간격으로 하나씩 균일하게 생성 (초)
 
     // ─── 렌더 루프 ───────────────────────────────────────────────────────────
     function tick(){
@@ -613,13 +616,13 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       flowerMat.uniforms["uTint"].value.copy(liveColor);
       flowerMat.uniforms["uTintAmount"].value=liveTintAmt;
 
-      // ─── 감정 최초 인식 시 최소 꽃잎 즉시 버스트 ───────────────────────
+      // ─── 감정 최초 인식 시 최소 꽃잎 개수 — 한꺼번에 대신 대기열에 적립 ──
       if(hasEmo && !prevHasEmo && activeRef.current){
         const burstCount=Math.min(
           PETAL_CONFIG.MIN_EMOTION_SPAWN_COUNT,
-          PETAL_CONFIG.MAX_PETAL_COUNT - flyPetals.length
+          PETAL_CONFIG.MAX_PETAL_COUNT - flyPetals.length - pendingSpawns
         );
-        for(let b=0;b<burstCount;b++) spawnPetal(Math.max(vol,0.3), liveColor, liveTintAmt);
+        pendingSpawns+=Math.max(0,burstCount);
       }
       prevHasEmo=hasEmo;
 
@@ -653,16 +656,28 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
                           * (t * t);
 
         if(Math.random() < spawnChance) {
-          // BURST_SPAWN_COUNT만큼 한 번에 생성
+          // BURST_SPAWN_COUNT만큼 — 한 번에 쏟지 않고 대기열에 적립
           const burst = Math.min(
             PETAL_CONFIG.BURST_SPAWN_COUNT,
-            PETAL_CONFIG.MAX_PETAL_COUNT - flyPetals.length
+            PETAL_CONFIG.MAX_PETAL_COUNT - flyPetals.length - pendingSpawns
           );
-          for(let b=0; b<burst; b++) spawnPetal(vol, liveColor, liveTintAmt);
+          pendingSpawns+=Math.max(0,burst);
         }
         // 황금 파티클은 꽃잎 궤적에서만 생성 (아래 petal loop 참고)
       }
       if(vol >= PETAL_CONFIG.AUDIO_THRESHOLD) emitBokeh(vol,fp);
+
+      // ─── 대기열에서 짧은 간격으로 하나씩 균일하게 생성 ──────────────────
+      if(pendingSpawns>0){
+        pendingSpawnTimer+=dt;
+        if(pendingSpawnTimer>=PENDING_SPAWN_INTERVAL){
+          pendingSpawnTimer=0;
+          pendingSpawns--;
+          spawnPetal(Math.max(vol,0.3), liveColor, liveTintAmt);
+        }
+      } else {
+        pendingSpawnTimer=0;
+      }
 
       // ═══════════════════════════════════════════════════════════════════════
       // 꽃잎 물리 update()
