@@ -11,22 +11,26 @@ export default async function handler(req, res) {
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const prompt = `다음 한국어 문장에서 6가지 감정의 강도를 분석하여 JSON으로만 응답하세요.
-값은 0.0~1.0 사이 실수입니다. 감정이 명확하게 느껴지지 않으면 해당 항목은 반드시 0.0으로 하세요.
-일상적인 말, 단순 정보 전달, 감정 없는 문장이면 전부 0.0으로 응답하세요.
-반드시 JSON 한 줄만 출력하세요. 다른 텍스트, 마크다운, 코드블록 없이.
-
-감정: love(사랑/애정), longing(그리움/추억), joy(기쁨/행복), sadness(슬픔/우울/미안함/사과/후회), excitement(설렘/기대), gratitude(감사/뿌듯함)
-
-문장: "${text.trim()}"
-
-출력 형식(이 형식만):
-{"love":0.0,"longing":0.0,"joy":0.0,"sadness":0.0,"excitement":0.0,"gratitude":0.0}`;
+  const SYSTEM = `너는 한국어 문장의 감정을 분석해 6개 감정(love, longing, joy, sadness, excitement, gratitude)의
+강도를 0.0~1.0 사이 점수로 평가하여 JSON 객체 하나만 출력하는 시스템이다.
+화자가 그 말을 누군가에게 직접 건넨다고 가정하고 평가하라. 짧은 한마디도 그 자체로 명확한 감정 표현이다.
+설명, 마크다운, 코드블록 없이 JSON만 출력하라.`;
 
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: "사랑해" },
+        { role: "assistant", content: '{"love":0.9,"longing":0,"joy":0.1,"sadness":0,"excitement":0,"gratitude":0}' },
+        { role: "user", content: "정말 미안해" },
+        { role: "assistant", content: '{"love":0,"longing":0,"joy":0,"sadness":0.85,"excitement":0,"gratitude":0}' },
+        { role: "user", content: "너무 고마워" },
+        { role: "assistant", content: '{"love":0,"longing":0,"joy":0,"sadness":0,"excitement":0,"gratitude":0.85}' },
+        { role: "user", content: "오늘 날씨 좋다" },
+        { role: "assistant", content: '{"love":0,"longing":0,"joy":0,"sadness":0,"excitement":0,"gratitude":0}' },
+        { role: "user", content: text.trim() },
+      ],
       temperature: 0.3,
       max_tokens: 100,
     });
@@ -44,7 +48,7 @@ export default async function handler(req, res) {
       total += parsed[k];
     });
 
-    if (total < 0.30) return res.json(NEUTRAL);
+    if (total < 0.15) return res.json(NEUTRAL);
     KEYS.forEach(k => { parsed[k] = parsed[k] / total; });
     return res.json(parsed);
 
