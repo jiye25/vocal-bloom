@@ -73,21 +73,32 @@ export default function App() {
       console.log("[SR] 인식 시작 ✅");
     };
 
+    let consecutiveFails = 0;
+    let lastFailTime = 0;
+
     rec.onerror = (e: any) => {
       console.error("[SR] 오류:", e.error);
       if (e.error === "not-allowed") {
         sessionRef.current = false;
         alert("마이크 권한이 차단됐습니다.\nChrome 설정 → 개인정보 보호 → 마이크에서 이 사이트 허용");
+        return;
       }
+      // ★ aborted/audio-capture 등이 짧은 시간 안에 연속 발생하면 백오프 증가
+      const now = Date.now();
+      if (now - lastFailTime < 3000) consecutiveFails++;
+      else consecutiveFails = 1;
+      lastFailTime = now;
     };
 
     rec.onend = () => {
       console.log("[SR] 인식 종료 — 재시작 예약");
       if (sessionRef.current) {
+        // ★ 연속 실패 시 지연을 점점 늘려 무한 재시도 폭주 방지 (최대 5초)
+        const delay = Math.min(400 * Math.pow(1.8, consecutiveFails), 5000);
         setTimeout(() => {
-          try { rec.start(); console.log("[SR] 재시작 ✅"); }
+          try { rec.start(); console.log(`[SR] 재시작 ✅ (지연 ${Math.round(delay)}ms)`); }
           catch (e) { console.warn("[SR] 재시작 실패:", e); }
-        }, 400);
+        }, delay);
       }
     };
 
