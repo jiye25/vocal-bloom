@@ -21,11 +21,39 @@ export default function App() {
   // Vercel 배포 환경에서는 API 함수가 항상 사용 가능
   useEffect(() => { setServerOk(true); }, []);
 
+  // ── 화면 꺼짐 방지 (전시용) ────────────────────────────────────────────────
+  const wakeLockRef = useRef<any>(null);
+  const requestWakeLock = async () => {
+    try {
+      if ("wakeLock" in navigator) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+        console.log("[WakeLock] 화면 꺼짐 방지 활성화 ✅");
+        wakeLockRef.current.addEventListener("release", () => {
+          console.log("[WakeLock] 해제됨 (탭 비활성 등) — 재요청 대기");
+        });
+      } else {
+        console.warn("[WakeLock] 이 브라우저는 Wake Lock API를 지원하지 않습니다.");
+      }
+    } catch (err) {
+      console.warn("[WakeLock] 요청 실패:", err);
+    }
+  };
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && sessionRef.current) {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
   // ── 세션 시작 ────────────────────────────────────────────────────────────────
   const initSession = async () => {
     setWelcomeScreen(false);
     sessionRef.current = true;
     console.log("[init] 세션 시작");
+    requestWakeLock();
 
     // ① 마이크 스트림 확보
     let stream: MediaStream;
