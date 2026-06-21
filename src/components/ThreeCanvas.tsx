@@ -26,11 +26,13 @@ const PETAL_CONFIG = {
 
   BASE_ANGLE:        -25,    // 생성 시 기본 Z 회전 각도 (도)
 
-  // ── 동선 제어: 우아한 한 줄기 흐름(은하수 스트림)을 위한 핵심 변수 ──────
-  TARGET_ANGLE:        -15,   // 최종 목적지 각도 (도, 완만한 우상향 대각선)
-  STREAM_WIDTH:        0.9,   // 바람 길의 최대 상하 허용 두께 (Three.js 월드 단위)
+  // ── 동선 제어: 우측 상단 꼭지점을 향한 우아한 질주를 위한 핵심 변수 ──────
+  TARGET_X:            0.95,  // 최종 목적지 X (화면 절반 너비 비율, 1.0=정확히 우측 끝)
+  TARGET_Y:            0.85,  // 최종 목적지 Y (화면 절반 높이 비율, 1.0=정확히 상단 끝)
+  STREAM_WIDTH:        0.9,   // 꽃·꼭지점 직선 기준 허용 상하 두께 (Three.js 월드 단위)
   RANDOM_DRIFT_FORCE:  0.05,  // 사방으로 흩어지게 만드는 난류(노이즈)의 최대 세기 (최소화)
-  CENTER_PULL_FORCE:   0.02,  // 중심 궤도로 꽃잎을 모아주는 인력의 세기
+  CENTER_PULL_FORCE:   0.04,  // 우측 상단 꼭지점으로 꽃잎을 모아 끌고 가는 인력 세기
+  MIN_X_VELOCITY:      0.55,  // 중간에 멈추는 현상을 막는 최소 오른쪽 전진 속도
   FORCE_DAMPING:       0.97,  // 관성을 부드럽게 만드는 감쇠율 (낮을수록 끈끈한 유체감)
 
   X_ROTATION_SPEED:   0.2,   // X축 앞뒤 까딱임 강도 (Pitch)
@@ -289,6 +291,14 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       return new THREE.Vector3((FLOWER_UV_X*2-1)*halfH*asp,-(FLOWER_UV_Y*2-1)*halfH,0);
     }
 
+    // ★ 최종 목적지: 화면 우측 상단 꼭지점 (Three.js 월드 좌표, Y는 위가 +)
+    function getTargetCorner():{x:number;y:number} {
+      const asp=container.clientWidth/container.clientHeight;
+      const halfH=Math.tan((camera.fov*Math.PI/180)/2)*camera.position.z;
+      const halfW=halfH*asp;
+      return { x: halfW*PETAL_CONFIG.TARGET_X, y: halfH*PETAL_CONFIG.TARGET_Y };
+    }
+
     // ─── 꽃 영상 (Three.js 씬 내부, renderOrder=10) ─────────────────────────
     const videoEl=document.createElement("video");
     videoEl.src="/flower_back.mp4";
@@ -406,13 +416,16 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       mesh.renderOrder=1;
       scene.add(mesh);
 
-      // 초기 속도: SPAWN_DIRECTION_ANGLE(3시=0°) 방향으로 출발
-      const spawnRad=PETAL_CONFIG.SPAWN_DIRECTION_ANGLE*Math.PI/180;
+      // 초기 속도: 태어난 즉시 우측 상단 꼭지점 방향으로 발사 (12시 솟구침 원천 차단)
+      const corner0=getTargetCorner();
+      const toCX=corner0.x-mesh.position.x, toCY=corner0.y-mesh.position.y;
+      const toCLen=Math.sqrt(toCX*toCX+toCY*toCY)||1;
+      const dir0X=toCX/toCLen, dir0Y=toCY/toCLen; // dir0Y는 항상 양수(위쪽) — 음수(아래) 방출 없음
       const initSpd=(0.08+Math.random()*0.04)*PETAL_CONFIG.INITIAL_SPAWN_SPEED;
       flyPetals.push({
         mesh, mat,
-        vx: Math.cos(spawnRad)*initSpd,
-        vy: Math.sin(spawnRad)*initSpd,
+        vx: dir0X*initSpd,
+        vy: dir0Y*initSpd,
         vz:(Math.random()-.5)*0.006,
         pitchVel:0,
         yawVel:0,
@@ -632,6 +645,7 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
       // 화면 경계 (월드 좌표)
       const halfH_s=Math.tan((camera.fov*Math.PI/180)/2)*camera.position.z;
       const halfW_s=halfH_s*(container.clientWidth/container.clientHeight);
+      const corner=getTargetCorner(); // ★ 최종 목적지: 화면 우측 상단 꼭지점
 
       for(let i=flyPetals.length-1;i>=0;i--){
         const p=flyPetals[i];
@@ -662,28 +676,22 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         // 노이즈 비중 높이고 직선 바람 줄임
         const noiseAmp=p.windStr*(1.0+vol*0.7)*windT;
 
-        // ── 4. 주 바람: TARGET_ANGLE 방향으로 고정, MAX_WIND_FORCE 적용 ──
-        const tRad=Math.abs(PETAL_CONFIG.TARGET_ANGLE)*Math.PI/180;
-        const STREAM_X=Math.cos(tRad), STREAM_Y=Math.sin(tRad);
+        // ── 4. 주 바람: 우측 상단 꼭지점(corner) 방향으로 고정, MAX_WIND_FORCE 적용 ──
+        // ★ 소용돌이 완전 제거 — 12시로 솟구쳤다가 꺾이는 잔상의 원인이었음
+        const toCornerX=corner.x-fp.x, toCornerY=corner.y-fp.y;
+        const toCornerLen=Math.sqrt(toCornerX*toCornerX+toCornerY*toCornerY)||1;
+        const STREAM_X=toCornerX/toCornerLen, STREAM_Y=toCornerY/toCornerLen;
         const windScale=PETAL_CONFIG.MAX_WIND_FORCE*(0.25+vol*0.75)*p.windStr;
         // 난류(노이즈) 영향력을 RANDOM_DRIFT_FORCE로 최소화 — 흩어짐 억제
         p.vx+=(STREAM_X*windScale + flow.x*noiseAmp*PETAL_CONFIG.RANDOM_DRIFT_FORCE)*dt;
         p.vy+=(STREAM_Y*windScale   + flow.y*noiseAmp*PETAL_CONFIG.RANDOM_DRIFT_FORCE)*dt;
         p.vz=0; // ★ z축 고정 — vz 누적으로 원근 축소되는 현상 방지
 
-        // ── 5. 소용돌이 ──────────────────────────────────────────────────────
-        const vcx=fp.x+1.8, vcy=fp.y+0.8;
-        const dvx=px-vcx, dvy=py-vcy;
-        const vdist=Math.sqrt(dvx*dvx+dvy*dvy)+0.8;
-        const omega=p.vortexSign*0.7/(vdist+2.0)*windT;
-        p.vx+=(-dvy/vdist)*omega*dt;
-        p.vy+=( dvx/vdist)*omega*dt;
-
         // ── 6. 공기 저항 — FORCE_DAMPING 적용 ───────────────────────────────
         const drag=Math.pow(PETAL_CONFIG.FORCE_DAMPING, dt*60);
         p.vx*=drag; p.vy*=drag; p.vz*=drag;
 
-        // ── 7. 메인 궤도 흡입력 — 중심선에서 멀어질수록 부드럽게 끌어당김 ──
+        // ── 7. 메인 궤도 흡입력 — 꽃→꼭지점 직선 중심에서 멀어질수록 끌어당김 ──
         const PERP_X=-STREAM_Y, PERP_Y=STREAM_X;
         const relX=px-fp.x, relY=py-fp.y;
         const perpDist=relX*PERP_X+relY*PERP_Y;
@@ -705,19 +713,15 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
           if(p.vy<0.35*p.windStr-0.7) p.vy*=0.86;
         }
 
-        // ── 8.4. 제자리 정체 방지 — 생성 즉시 최소 전진 속도 보장 ──────────
-        // (FORCE_DAMPING이 실제 감쇠를 적용하므로 바닥 속도를 강화해 정체 방지)
-        p.vx=Math.max(p.vx,STREAM_X*0.55);
-        p.vy=Math.max(p.vy,STREAM_Y*0.3);
+        // ── 8.4. 제자리 정체 방지 — MIN_X_VELOCITY로 최소 전진 속도 보장 ──
+        p.vx=Math.max(p.vx,PETAL_CONFIG.MIN_X_VELOCITY*0.7);
+        p.vy=Math.max(p.vy,STREAM_Y*PETAL_CONFIG.MIN_X_VELOCITY*0.55);
 
-        // ── 8.6. 0.3초 이상 정체 완전 차단 — 목적지 방향 강제 진행
+        // ── 8.6. 0.3초 이상 정체 완전 차단 — 꼭지점 방향 강제 진행
         if(p.age>0.3){
-          p.vx=Math.max(p.vx,STREAM_X*0.8);
-          p.vy=Math.max(p.vy,STREAM_Y*0.45);
+          p.vx=Math.max(p.vx,PETAL_CONFIG.MIN_X_VELOCITY);
+          p.vy=Math.max(p.vy,STREAM_Y*PETAL_CONFIG.MIN_X_VELOCITY*0.8);
         }
-
-        // ── 8.5. 왼쪽 1/3 구역에서 위쪽 속도 억제 (12시 방향 차단)
-        if(px < -halfW_s/3 && p.vy > 0) p.vy *= 0.75;
 
         // ── 9. 위치 이동 ──────────────────────────────────────────────────────
         p.mesh.position.x+=p.vx*dt;
@@ -781,9 +785,10 @@ export default function ThreeCanvas({ volume, emotionScores, isActive }:Props) {
         const sFlow=curlNoise(snx,sny,snz,time);
         const sNoiseAmp=s.windStr*(0.20+vol*0.20)*sWindT;  // ★ 1/5 수준으로 감소
 
-        // 4. 주 바람
-        const stRad=Math.abs(PETAL_CONFIG.TARGET_ANGLE)*Math.PI/180;
-        const sSX=Math.cos(stRad), sSY=Math.sin(stRad);
+        // 4. 주 바람 — 우측 상단 꼭지점 방향 (꽃→꼭지점 직선과 동일)
+        const sToCornerX=corner.x-fp.x, sToCornerY=corner.y-fp.y;
+        const sToCornerLen=Math.sqrt(sToCornerX*sToCornerX+sToCornerY*sToCornerY)||1;
+        const sSX=sToCornerX/sToCornerLen, sSY=sToCornerY/sToCornerLen;
         const sWindScale=PETAL_CONFIG.MAX_WIND_FORCE*(0.25+vol*0.75)*s.windStr;
         s.vx+=(sSX*sWindScale+sFlow.x*sNoiseAmp*0.7)*dt;
         s.vy+=(sSY*sWindScale+sFlow.y*sNoiseAmp*0.5)*dt;
