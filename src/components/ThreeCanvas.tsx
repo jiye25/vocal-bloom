@@ -4,12 +4,12 @@ import type { EmotionScores } from "../types";
 
 // ─── 감정 색상 ────────────────────────────────────────────────────────────────
 const EMOTION_COLORS: Record<keyof EmotionScores, THREE.Color> = {
-  love:       new THREE.Color(0.923, 0.687, 0.798),
-  longing:    new THREE.Color(0.736, 0.685, 0.914),
-  joy:        new THREE.Color(0.975, 0.949, 0.460),
-  sadness:    new THREE.Color(0.553, 0.669, 0.742),
-  excitement: new THREE.Color(0.762, 0.981, 0.905),
-  gratitude:  new THREE.Color(1.000, 0.718, 0.508),
+  love:       new THREE.Color(0.929, 0.681, 0.798),
+  longing:    new THREE.Color(0.733, 0.679, 0.920),
+  joy:        new THREE.Color(0.988, 0.961, 0.447),
+  sadness:    new THREE.Color(0.548, 0.670, 0.747),
+  excitement: new THREE.Color(0.757, 0.986, 0.907),
+  gratitude:  new THREE.Color(1.000, 0.716, 0.496),
 };
 const WHITE = new THREE.Color(1, 1, 1);
 
