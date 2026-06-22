@@ -8,6 +8,27 @@ const SYSTEM = `너는 한국어 문장의 감정을 분석해 6개 감정(love,
 화자가 그 말을 누군가에게 직접 건넨다고 가정하고 평가하라. 짧은 한마디도 그 자체로 명확한 감정 표현이다.
 설명, 마크다운, 코드블록 없이 JSON만 출력하라.`;
 
+const RESPONSE_SCHEMA = {
+  type: "json_schema",
+  json_schema: {
+    name: "emotion_scores",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        love:       { type: "number" },
+        longing:    { type: "number" },
+        joy:        { type: "number" },
+        sadness:    { type: "number" },
+        excitement: { type: "number" },
+        gratitude:  { type: "number" },
+      },
+      required: KEYS,
+      additionalProperties: false,
+    },
+  },
+};
+
 async function callModel(openai, text) {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -23,16 +44,13 @@ async function callModel(openai, text) {
       { role: "assistant", content: '{"love":0,"longing":0,"joy":0,"sadness":0,"excitement":0,"gratitude":0}' },
       { role: "user", content: text },
     ],
-    temperature: 0.5,
+    temperature: 0.7,
     max_tokens: 100,
+    response_format: RESPONSE_SCHEMA,
   });
 
   const raw = completion.choices[0].message.content.trim();
-  const clean = raw.replace(/```[a-z]*/gi, "").replace(/```/g, "").trim();
-  const jsonMatch = clean.match(/\{[\s\S]*?\}/);
-  if (!jsonMatch) throw new Error(`JSON 없음: ${raw}`);
-
-  const scores = JSON.parse(jsonMatch[0]);
+  const scores = JSON.parse(raw);
   const parsed = {};
   let total = 0;
   KEYS.forEach(k => {
