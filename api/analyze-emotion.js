@@ -48,12 +48,12 @@ export default async function handler(req, res) {
       total += parsed[k];
     });
 
-    if (total < 0.15) return res.json(NEUTRAL);
+    if (total < 0.15) return res.json({ ...NEUTRAL, _dbg: "threshold", _raw: raw });
     KEYS.forEach(k => { parsed[k] = parsed[k] / total; });
     return res.json(parsed);
 
   } catch (err) {
     console.error("[감정분석 오류]", err.message);
-    return res.json(NEUTRAL);
+    return res.json({ ...NEUTRAL, _dbg: "catch", _err: String(err && (err.status||err.code||err.message) || err) });
   }
 }
