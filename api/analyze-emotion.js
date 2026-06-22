@@ -88,27 +88,27 @@ export default async function handler(req, res) {
   const { text } = req.body || {};
   if (!text?.trim()) return res.json(NEUTRAL);
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const trimmed = text.trim();
 
+  // ★ 키워드 매칭이 되면 AI보다 우선 — 흔한 표현은 AI의 불안정한 오분류를 피해 정확하게 처리
+  const fb = keywordFallback(trimmed);
+  if (fb) return res.json(fb);
+
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   try {
-    // ★ 모델이 가끔 전부 0으로 응답하는 불안정성 보정 — 0점이면 한 번 더 재시도
+    // 키워드에 없는 애매한/긴 문장만 AI에 위임 (실패 시 한 번 재시도)
     let result = await callModel(openai, trimmed);
     if (result.total < 0.15) {
       result = await callModel(openai, trimmed);
     }
+    if (result.total < 0.15) return res.json(NEUTRAL);
 
-    if (result.total < 0.15) {
-      const fb = keywordFallback(trimmed);
-      return res.json(fb ? { ...fb, _dbg: "fallback-used" } : { ...NEUTRAL, _dbg: "fallback-null", _total: result.total });
-    }
     const parsed = {};
     KEYS.forEach(k => { parsed[k] = result.parsed[k] / result.total; });
-    return res.json({ ...parsed, _dbg: "ai-success" });
+    return res.json(parsed);
 
   } catch (err) {
     console.error("[감정분석 오류]", err.message);
-    const fb = keywordFallback(trimmed);
-    return res.json({ ...(fb || NEUTRAL), _dbg: "catch", _err: String(err && err.message || err) });
+    return res.json(NEUTRAL);
   }
 }
