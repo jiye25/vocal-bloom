@@ -100,15 +100,15 @@ export default async function handler(req, res) {
 
     if (result.total < 0.15) {
       const fb = keywordFallback(trimmed);
-      return res.json(fb || NEUTRAL);
+      return res.json(fb ? { ...fb, _dbg: "fallback-used" } : { ...NEUTRAL, _dbg: "fallback-null", _total: result.total });
     }
     const parsed = {};
     KEYS.forEach(k => { parsed[k] = result.parsed[k] / result.total; });
-    return res.json(parsed);
+    return res.json({ ...parsed, _dbg: "ai-success" });
 
   } catch (err) {
     console.error("[감정분석 오류]", err.message);
     const fb = keywordFallback(trimmed);
-    return res.json(fb || NEUTRAL);
+    return res.json({ ...(fb || NEUTRAL), _dbg: "catch", _err: String(err && err.message || err) });
   }
 }
