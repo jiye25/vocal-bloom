@@ -78,7 +78,7 @@ export default function App() {
     const poll = () => {
       analyser.getByteFrequencyData(data);
       const avg = data.reduce((a, b) => a + b, 0) / data.length;
-      smooth = smooth * 0.75 + Math.min(avg / 128, 1) * 0.25;
+      smooth = smooth * 0.75 + Math.min(avg / 85, 1) * 0.25;
       setVolume(smooth);
       volumeLoopRef.current = requestAnimationFrame(poll);
     };
