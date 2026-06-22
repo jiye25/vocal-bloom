@@ -60,6 +60,28 @@ async function callModel(openai, text) {
   return { parsed, total };
 }
 
+// ★ AI가 0점만 줄 때를 위한 키워드 기반 보조 판별기 (최소한의 안전망)
+const KEYWORD_MAP = {
+  love:       ["사랑해","사랑하다","사랑한다","좋아해","좋아하다","애정","소중해","소중하다","자기야","여보"],
+  longing:    ["보고싶","보고팠","그리워","그립다","그리움","반가워","반갑다","오랜만"],
+  joy:        ["기뻐","기쁘다","행복","즐거","신나","신난다"],
+  sadness:    ["미안","죄송","사과","후회","잘못","아쉬워","아쉽다","속상","슬프","슬퍼"],
+  excitement: ["설레","설렘","두근","떨려","떨리다","기대돼","기대된다","기대되","떨린다"],
+  gratitude:  ["고마워","고맙다","감사","든든해","든든하다","다행","덕분"],
+};
+function keywordFallback(text) {
+  const scores = { ...NEUTRAL };
+  let total = 0;
+  KEYS.forEach(k => {
+    KEYWORD_MAP[k].forEach(kw => {
+      if (text.includes(kw)) { scores[k] += 1; total += 1; }
+    });
+  });
+  if (total === 0) return null;
+  KEYS.forEach(k => { scores[k] = scores[k] / total; });
+  return scores;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -76,13 +98,17 @@ export default async function handler(req, res) {
       result = await callModel(openai, trimmed);
     }
 
-    if (result.total < 0.15) return res.json(NEUTRAL);
+    if (result.total < 0.15) {
+      const fb = keywordFallback(trimmed);
+      return res.json(fb || NEUTRAL);
+    }
     const parsed = {};
     KEYS.forEach(k => { parsed[k] = result.parsed[k] / result.total; });
     return res.json(parsed);
 
   } catch (err) {
     console.error("[감정분석 오류]", err.message);
-    return res.json(NEUTRAL);
+    const fb = keywordFallback(trimmed);
+    return res.json(fb || NEUTRAL);
   }
 }
