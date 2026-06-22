@@ -92,7 +92,7 @@ export default async function handler(req, res) {
 
   // ★ 키워드 매칭이 되면 AI보다 우선 — 흔한 표현은 AI의 불안정한 오분류를 피해 정확하게 처리
   const fb = keywordFallback(trimmed);
-  if (fb) return res.json({ ...fb, _ver: "v2-keyword-priority" });
+  if (fb) return res.json(fb);
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   try {
