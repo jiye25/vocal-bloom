@@ -43,7 +43,7 @@ const PETAL_CONFIG = {
   SPAWN_RADIUS_MIN:   0.80,  // 수술 중심 제외 최소 반지름
   SPAWN_RADIUS_MAX:   2.2,   // 스폰 최대 반지름
 
-  AUDIO_THRESHOLD:    0.06,  // 꽃잎 생성 시작 최소 볼륨 (0~1) — 소음 차단
+  AUDIO_THRESHOLD:    0.035, // 꽃잎 생성 시작 최소 볼륨 (0~1) — 소음 차단
   MAX_WIND_FORCE:     1.8,   // 최대 볼륨 시 바람 세기 승수
   MAX_PETAL_COUNT:    20,    // 화면 내 최대 꽃잎 수
 
