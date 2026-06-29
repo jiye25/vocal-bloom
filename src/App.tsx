@@ -8,11 +8,23 @@ const INITIAL_EMOTIONS: EmotionScores = {
   sadness: 0, excitement: 0, gratitude: 0,
 };
 
+const EMOTION_LABEL: Record<keyof EmotionScores, string> = {
+  love: "사랑", longing: "그리움", joy: "기쁨",
+  sadness: "슬픔", excitement: "설렘", gratitude: "감사",
+};
+
+function getDominantEmotion(scores: EmotionScores): keyof EmotionScores | null {
+  const keys = Object.keys(scores) as (keyof EmotionScores)[];
+  const best = keys.reduce((a, b) => scores[a] > scores[b] ? a : b);
+  return scores[best] > 0.15 ? best : null;
+}
+
 export default function App() {
   const [welcomeScreen, setWelcomeScreen] = useState(true);
   const [volume, setVolume]               = useState(0);
   const [emotionScores, setEmotionScores] = useState<EmotionScores>(INITIAL_EMOTIONS);
   const [serverOk, setServerOk]           = useState<boolean | null>(null);
+  const [transcript, setTranscript]       = useState("");
 
   const volumeLoopRef  = useRef<number | null>(null);
   const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -148,6 +160,7 @@ export default function App() {
       }
       if (final) {
         console.log("[SR] 최종:", final);
+        setTranscript(final.trim());
         analyzeEmotion(final.trim());
       }
     };
@@ -236,6 +249,20 @@ export default function App() {
           {serverOk === false && (
             <div className="absolute top-6 left-6 text-[9px] font-mono text-red-400/70 pointer-events-none">
               ⚠ 서버 미연결
+            </div>
+          )}
+
+          {/* 인식된 음성 + 감정 (하단, 작게) */}
+          {transcript && (
+            <div className="absolute bottom-6 left-1/2 pointer-events-none z-30"
+                 style={{ transform: "translateX(-50%)" }}>
+              <p className="text-[11px] text-white/50 font-light tracking-wide text-center">
+                "{transcript}"
+                {(() => {
+                  const dominant = getDominantEmotion(emotionScores);
+                  return dominant ? ` · ${EMOTION_LABEL[dominant]}` : "";
+                })()}
+              </p>
             </div>
           )}
         </>
